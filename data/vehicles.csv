@@ -1,0 +1,9 @@
+vehicle_id,driver_name,speed,status,current_location
+VEH-01,Alice Monroe,90.0,on_route,New York
+VEH-02,Bob Tremblay,85.0,available,Chicago
+VEH-03,Carmen Reyes,95.0,on_route,Los Angeles
+VEH-04,David Kim,80.0,on_route,Houston
+VEH-05,Elena Vasquez,75.0,on_route,Phoenix
+VEH-06,Frank Osei,100.0,available,Philadelphia
+VEH-07,Grace Nakamura,88.0,on_route,San Antonio
+VEH-08,Henry Okafor,92.0,available,Seattle
