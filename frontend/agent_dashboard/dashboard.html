@@ -1,6 +1,323 @@
-<!DOCTYPE html>
-<!-- TODO Phase 9 — Agent dashboard -->
++<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>VOXOPS Agent Dashboard</title></head>
-<body><h1>VOXOPS Agent Dashboard — Coming in Phase 9</h1></body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceOps AI Gateway — Enterprise Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+</head>
+<body>
+
+  <!-- ═══════════════ TOP NAVIGATION BAR ═══════════════ -->
+  <nav class="topnav">
+    <div class="topnav__left">
+      <div class="topnav__logo">
+        <div class="logo-icon"><i class="fas fa-broadcast-tower"></i></div>
+        <div class="logo-text">
+          <span class="logo-title">VoiceOps AI Gateway</span>
+          <span class="logo-subtitle">Enterprise Voice Intelligence Platform</span>
+        </div>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- ═══════════════ BODY WRAPPER ═══════════════ -->
+  <div class="app-body">
+
+    <!-- ═══════════════ LEFT NAVIGATION PANEL ═══════════════ -->
+    <aside class="sidebar">
+      <ul class="sidebar__menu">
+        <li class="sidebar__item sidebar__item--active" data-page="dashboard">
+          <i class="fas fa-th-large"></i><span>Dashboard</span>
+        </li>
+        <li class="sidebar__item" data-page="voice">
+          <i class="fas fa-microphone-alt"></i><span>Voice Interaction</span>
+        </li>
+        <li class="sidebar__item" data-page="pipeline">
+          <i class="fas fa-project-diagram"></i><span>Pipeline Monitor</span>
+        </li>
+        <li class="sidebar__item" data-page="router">
+          <i class="fas fa-route"></i><span>Router Decision Map</span>
+        </li>
+        <li class="sidebar__item" data-page="data">
+          <i class="fas fa-database"></i><span>Enterprise Data</span>
+        </li>
+      </ul>
+      <div class="sidebar__footer">
+        <div class="sidebar__version">v2.4.1 · Quantum Core</div>
+      </div>
+    </aside>
+
+    <!-- ═══════════════ MAIN DASHBOARD WORKSPACE ═══════════════ -->
+    <main class="workspace">
+
+      <!-- ── Three-Panel Core ── -->
+      <section class="panels-grid">
+
+        <!-- ─── PANEL 1 — Voice Interaction Console ─── -->
+        <div class="panel voice-panel glass-card">
+          <div class="panel__header">
+            <h2><i class="fas fa-microphone-alt"></i> Voice Interaction Console</h2>
+            <span class="panel__badge">Live</span>
+          </div>
+          <div class="panel__body voice-body">
+            <!-- Mic area -->
+            <div class="mic-area">
+              <button class="mic-btn" id="micBtn" title="Record Voice">
+                <div class="mic-btn__ring"></div>
+                <div class="mic-btn__ring mic-btn__ring--2"></div>
+                <i class="fas fa-microphone"></i>
+              </button>
+              <span class="mic-label" id="micLabel">Tap to Record</span>
+            </div>
+
+            <!-- Waveform -->
+            <div class="waveform-container" id="waveformContainer">
+              <canvas id="waveCanvas" width="540" height="80"></canvas>
+            </div>
+
+            <!-- Voice Controls -->
+            <div class="voice-controls">
+              <button class="ctrl-btn" id="btnRecord"><i class="fas fa-circle"></i> Record Voice</button>
+              <button class="ctrl-btn" id="btnPlayRec" disabled><i class="fas fa-play"></i> Play Recorded</button>
+              <button class="ctrl-btn ctrl-btn--ai" id="btnPlayAI" disabled><i class="fas fa-robot"></i> Play AI Response</button>
+            </div>
+
+            <!-- Audio Details Card -->
+            <div class="audio-details glass-card-inner" id="audioDetails" style="display:none;">
+              <div class="audio-details__row">
+                <span class="audio-details__label"><i class="fas fa-wave-square"></i> Duration</span>
+                <span class="audio-details__value" id="audioDuration">—</span>
+              </div>
+              <div class="audio-details__row">
+                <span class="audio-details__label"><i class="fas fa-clock"></i> Timestamp</span>
+                <span class="audio-details__value" id="audioTimestamp">—</span>
+              </div>
+              <div class="audio-details__row">
+                <span class="audio-details__label"><i class="fas fa-fingerprint"></i> Session ID</span>
+                <span class="audio-details__value" id="audioSession">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── PANEL 2 — AI Pipeline Monitor ─── -->
+        <div class="panel pipeline-panel glass-card">
+          <div class="panel__header">
+            <h2><i class="fas fa-project-diagram"></i> AI Pipeline Monitor</h2>
+            <span class="panel__badge panel__badge--processing" id="pipelineBadge">Idle</span>
+          </div>
+          <div class="panel__body pipeline-body">
+            <div class="pipeline" id="pipeline">
+              <!-- Stage 1 -->
+              <div class="pipeline-node" data-stage="1" id="stage1">
+                <div class="pipeline-node__icon"><i class="fas fa-microphone"></i></div>
+                <div class="pipeline-node__label">Voice Input</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage1Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn1"></div>
+
+              <!-- Stage 2 -->
+              <div class="pipeline-node" data-stage="2" id="stage2">
+                <div class="pipeline-node__icon"><i class="fas fa-language"></i></div>
+                <div class="pipeline-node__label">Speech Recognition</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage2Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn2"></div>
+
+              <!-- Stage 3 -->
+              <div class="pipeline-node" data-stage="3" id="stage3">
+                <div class="pipeline-node__icon"><i class="fas fa-brain"></i></div>
+                <div class="pipeline-node__label">Intent Detection</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage3Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn3"></div>
+
+              <!-- Stage 4 -->
+              <div class="pipeline-node" data-stage="4" id="stage4">
+                <div class="pipeline-node__icon"><i class="fas fa-route"></i></div>
+                <div class="pipeline-node__label">Task Router</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage4Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn4"></div>
+
+              <!-- Stage 5 -->
+              <div class="pipeline-node" data-stage="5" id="stage5">
+                <div class="pipeline-node__icon"><i class="fas fa-database"></i></div>
+                <div class="pipeline-node__label">Data Retrieval</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage5Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn5"></div>
+
+              <!-- Stage 6 -->
+              <div class="pipeline-node" data-stage="6" id="stage6">
+                <div class="pipeline-node__icon"><i class="fas fa-cogs"></i></div>
+                <div class="pipeline-node__label">Response Generation</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage6Detail"></div>
+              </div>
+              <div class="pipeline-connector" id="conn6"></div>
+
+              <!-- Stage 7 -->
+              <div class="pipeline-node" data-stage="7" id="stage7">
+                <div class="pipeline-node__icon"><i class="fas fa-volume-up"></i></div>
+                <div class="pipeline-node__label">Voice Output</div>
+                <div class="pipeline-node__status">Pending</div>
+                <div class="pipeline-node__detail" id="stage7Detail"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── PANEL 3 — Enterprise Data Viewer ─── -->
+        <div class="panel data-panel glass-card">
+          <div class="panel__header">
+            <h2><i class="fas fa-database"></i> Enterprise Data Viewer</h2>
+          </div>
+          <div class="panel__body data-body">
+
+            <!-- Intent Card -->
+            <div class="data-card glass-card-inner" id="intentCard">
+              <div class="data-card__header">
+                <i class="fas fa-bullseye"></i> Detected Intent
+              </div>
+              <div class="data-card__content">
+                <div class="data-row"><span>Intent Type</span><span id="intentType">—</span></div>
+                <div class="data-row"><span>Confidence</span>
+                  <div class="confidence-bar-wrap">
+                    <div class="confidence-bar" id="confidenceBar" style="width:0%"></div>
+                  </div>
+                  <span id="confidenceVal">0 %</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- API Response Card -->
+            <div class="data-card glass-card-inner" id="apiCard">
+              <div class="data-card__header">
+                <i class="fas fa-server"></i> API Response Data
+              </div>
+              <div class="data-card__content" id="apiResponseContent">
+                <div class="data-row"><span>Order ID</span><span id="apiOrderId">—</span></div>
+                <div class="data-row"><span>Warehouse</span><span id="apiWarehouse">—</span></div>
+                <div class="data-row"><span>Status</span><span id="apiStatus" class="badge badge--transit">—</span></div>
+                <div class="data-row"><span>ETA</span><span id="apiEta">—</span></div>
+              </div>
+            </div>
+
+            <!-- Conversation Summary Card -->
+            <div class="data-card glass-card-inner" id="summaryCard">
+              <div class="data-card__header">
+                <i class="fas fa-list-check"></i> Conversation Summary
+              </div>
+              <div class="data-card__content summary-list" id="summaryList">
+                <div class="summary-item"><i class="fas fa-circle-dot"></i> Waiting for interaction …</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Router Decision Map ── -->
+      <section class="router-section glass-card">
+        <div class="panel__header">
+          <h2><i class="fas fa-route"></i> Router Decision Map</h2>
+        </div>
+        <div class="router-body">
+          <div class="router-source">
+            <div class="router-source__icon"><i class="fas fa-brain"></i></div>
+            <span>Task Router</span>
+          </div>
+          <div class="router-paths">
+            <div class="router-path" id="routeKB" data-route="kb">
+              <div class="router-path__line"></div>
+              <div class="router-path__node">
+                <i class="fas fa-book"></i>
+                <span>Knowledge Base</span>
+              </div>
+            </div>
+            <div class="router-path router-path--selected" id="routeAPI" data-route="api">
+              <div class="router-path__line"></div>
+              <div class="router-path__node">
+                <i class="fas fa-server"></i>
+                <span>Enterprise API</span>
+              </div>
+            </div>
+            <div class="router-path" id="routeHuman" data-route="human">
+              <div class="router-path__line"></div>
+              <div class="router-path__node">
+                <i class="fas fa-user-tie"></i>
+                <span>Human Escalation</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Conversation Logs ── -->
+      <section class="logs-section glass-card">
+        <div class="panel__header panel__header--collapsible" id="logsToggle">
+          <h2><i class="fas fa-scroll"></i> Conversation Logs</h2>
+          <button class="expand-btn"><i class="fas fa-chevron-down"></i></button>
+        </div>
+        <div class="logs-body" id="logsBody">
+          <div class="log-message log-message--user">
+            <div class="log-avatar"><i class="fas fa-user"></i></div>
+            <div class="log-content">
+              <div class="log-text">"Where is my order 123?"</div>
+              <div class="log-meta">
+                <span><i class="fas fa-clock"></i> 10:42:18 AM</span>
+                <span><i class="fas fa-tag"></i> Order Tracking</span>
+                <span><i class="fas fa-stopwatch"></i> 1.8 s</span>
+              </div>
+            </div>
+          </div>
+          <div class="log-message log-message--ai">
+            <div class="log-avatar"><i class="fas fa-robot"></i></div>
+            <div class="log-content">
+              <div class="log-text">"Your order has left the Chennai warehouse and will arrive tomorrow by 5 PM."</div>
+              <div class="log-meta">
+                <span><i class="fas fa-clock"></i> 10:42:20 AM</span>
+                <span><i class="fas fa-tag"></i> Response</span>
+                <span><i class="fas fa-stopwatch"></i> 0.4 s</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ═══════════════ FOOTER STATUS BAR ═══════════════ -->
+  <footer class="footer-bar">
+    <div class="footer-item">
+      <span class="footer-dot footer-dot--green"></span>
+      <span>AI Gateway: <strong>Active</strong></span>
+    </div>
+    <div class="footer-item">
+      <i class="fas fa-gauge-high"></i>
+      <span>Avg Latency: <strong id="footerLatency">1.8 s</strong></span>
+    </div>
+    <div class="footer-item">
+      <i class="fas fa-users"></i>
+      <span>Active Sessions: <strong id="footerSessions">3</strong></span>
+    </div>
+    <div class="footer-item">
+      <i class="fas fa-clock"></i>
+      <span>Updated: <strong id="footerUpdated">Just now</strong></span>
+    </div>
+  </footer>
+
+  <script src="dashboard.js"></script>
+</body>
 </html>
