@@ -31,8 +31,12 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 class VoiceQueryResponse(BaseModel):
     transcript: str
     intent: str | None = None
+    confidence: float | None = None
+    entities: dict | None = None
     response_text: str
     audio_url: str | None = None
+    needs_escalation: bool = False
+    ticket_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -48,10 +52,10 @@ async def voice_query(
     """
     Accept a voice query (audio file **or** text) and return a response.
 
-    Pipeline (Phase 7 will add orchestrator integration):
+    Pipeline:
       1. STT transcription (if audio provided)
-      2. Intent detection (stub — always returns 'general')
-      3. Response generation (stub — echoes transcript)
+      2. Orchestrator: Intent detection → Data retrieval → Simulation → Response
+      3. Agent handoff (if escalation needed)
     """
     if audio is None and text is None:
         raise HTTPException(status_code=400, detail="Provide either 'audio' file or 'text' form field.")
@@ -86,15 +90,18 @@ async def voice_query(
     if not transcript.strip():
         raise HTTPException(status_code=400, detail="Could not extract any text from the input.")
 
-    # --- Intent detection (stub for Phase 7) ---
-    intent = "general"
+    # --- Orchestrator: intent → data → simulation → response → handoff ---
+    from src.voxops.backend.services.orchestrator import process_query
 
-    # --- Response generation (stub for Phase 7) ---
-    response_text = f"Received your query: '{transcript}'. Full AI processing will be available after Phase 7."
+    result = process_query(query=transcript, db=db)
 
     return VoiceQueryResponse(
-        transcript=transcript,
-        intent=intent,
-        response_text=response_text,
+        transcript=result.transcript,
+        intent=result.intent,
+        confidence=result.confidence,
+        entities=result.entities,
+        response_text=result.response_text,
         audio_url=None,
+        needs_escalation=result.needs_escalation,
+        ticket_id=result.handoff.ticket_id if result.handoff else None,
     )

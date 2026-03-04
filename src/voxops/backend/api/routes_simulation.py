@@ -2,9 +2,8 @@
 VOXOPS AI Gateway — Simulation / Prediction Endpoints
 
 GET /predict-delivery/{order_id}
-  Returns an estimated delivery time for the given order.
-  Uses route distance, vehicle speed, and traffic level for a basic estimate.
-  Full SimPy integration will be added in Phase 5.
+  Runs a full SimPy-based logistics simulation (route + warehouse)
+  and returns a delivery prediction.
 """
 
 from __future__ import annotations
@@ -15,7 +14,8 @@ from sqlalchemy.orm import Session
 
 from configs.logging_config import get_logger
 from src.voxops.database.db import get_db
-from src.voxops.database.models import Order, Route, Vehicle
+from src.voxops.database.models import Order, Route, Vehicle, Warehouse
+from src.voxops.simulation.delivery_predictor import predict_delivery as sim_predict
 
 log = get_logger(__name__)
 
@@ -26,19 +26,43 @@ router = APIRouter(prefix="/simulation", tags=["simulation"])
 # Response schema
 # ---------------------------------------------------------------------------
 
+class RouteDetail(BaseModel):
+    distance_km: float
+    base_speed_kmh: float
+    traffic_level: str
+    traffic_multiplier: float
+    effective_speed_kmh: float
+    travel_time_hours: float
+    travel_time_minutes: float
+    random_delay_hours: float
+    total_time_hours: float
+    total_time_minutes: float
+
+
+class WarehouseDetail(BaseModel):
+    warehouse_id: str
+    capacity: int
+    current_load: int
+    utilisation_pct: float
+    queue_position: int
+    queue_wait_hours: float
+    processing_hours: float
+    total_warehouse_hours: float
+    total_warehouse_minutes: float
+
+
 class DeliveryPrediction(BaseModel):
     order_id: str
     origin: str
     destination: str
-    distance_km: float
     vehicle_id: str | None
-    vehicle_speed_kmh: float | None
-    traffic_level: str | None
-    traffic_multiplier: float | None
-    estimated_hours: float | None
-    estimated_minutes: float | None
+    route: RouteDetail
+    warehouse: WarehouseDetail
+    total_hours: float
+    total_minutes: float
+    delay_probability: float
     confidence: str
-    note: str
+    summary: str
 
 
 # ---------------------------------------------------------------------------
@@ -48,71 +72,83 @@ class DeliveryPrediction(BaseModel):
 @router.get("/predict-delivery/{order_id}", response_model=DeliveryPrediction)
 def predict_delivery(order_id: str, db: Session = Depends(get_db)):
     """
-    Estimate delivery time for an order.
+    Full delivery prediction using SimPy simulation.
 
-    Basic formula (will be replaced by SimPy simulation in Phase 5):
-        travel_time = distance / (speed × traffic_multiplier)
+    Combines route travel time (with traffic & random delay) and
+    warehouse processing time (queue + loading) into one estimate.
     """
-    # Fetch order
+    # --- Fetch order -------------------------------------------------------
     order = db.query(Order).filter(Order.order_id == order_id).first()
     if order is None:
         raise HTTPException(status_code=404, detail=f"Order '{order_id}' not found.")
 
-    # Fetch vehicle (if assigned)
-    vehicle = None
-    speed: float | None = None
+    # --- Fetch vehicle -----------------------------------------------------
+    speed_kmh = 60.0  # fallback
     if order.vehicle_id:
         vehicle = db.query(Vehicle).filter(Vehicle.vehicle_id == order.vehicle_id).first()
         if vehicle:
-            speed = vehicle.speed
+            speed_kmh = vehicle.speed
 
-    # Find matching route
+    # --- Fetch route -------------------------------------------------------
     route = (
         db.query(Route)
         .filter(Route.origin == order.origin, Route.destination == order.destination)
         .first()
     )
+    traffic_level = route.average_traffic if route else "medium"
 
-    traffic_level: str | None = None
-    traffic_mult: float | None = None
-    if route:
-        traffic_level = route.average_traffic
-        traffic_mult = route.traffic_multiplier
+    # --- Fetch origin warehouse (best match by city) -----------------------
+    wh = db.query(Warehouse).filter(Warehouse.city == order.origin).first()
+    wh_id = wh.warehouse_id if wh else "WH-DEFAULT"
+    wh_cap = wh.capacity if wh else 1000
+    wh_load = wh.current_load if wh else 0
 
-    # Compute estimate
-    estimated_hours: float | None = None
-    estimated_minutes: float | None = None
-    confidence = "low"
-    note = ""
-
-    if speed and speed > 0:
-        multiplier = traffic_mult if traffic_mult else 0.80  # default medium
-        effective_speed = speed * multiplier
-        estimated_hours = round(order.distance / effective_speed, 2)
-        estimated_minutes = round(estimated_hours * 60, 1)
-        confidence = "medium" if route else "low"
-        note = "Basic estimate using distance / (speed × traffic). Phase 5 adds SimPy simulation."
-    else:
-        note = "No vehicle assigned or vehicle speed unavailable — cannot estimate."
+    # --- Run simulation ----------------------------------------------------
+    result = sim_predict(
+        distance_km=order.distance,
+        speed_kmh=speed_kmh,
+        traffic_level=traffic_level,
+        warehouse_id=wh_id,
+        warehouse_capacity=wh_cap,
+        warehouse_load=wh_load,
+    )
 
     log.info(
-        "Delivery prediction for {}: {:.1f}h (confidence={})",
-        order_id,
-        estimated_hours or 0,
-        confidence,
+        "Prediction for {}: {:.2f}h total, delay_prob={:.1%}",
+        order_id, result.total_hours, result.delay_probability,
     )
 
     return DeliveryPrediction(
         order_id=order.order_id,
         origin=order.origin,
         destination=order.destination,
-        distance_km=order.distance,
         vehicle_id=order.vehicle_id,
-        vehicle_speed_kmh=speed,
-        traffic_level=traffic_level,
-        traffic_multiplier=traffic_mult,
-        estimated_hours=estimated_hours,
-        estimated_minutes=estimated_minutes,
-        confidence=confidence,
-        note=note,
+        route=RouteDetail(
+            distance_km=result.route.distance_km,
+            base_speed_kmh=result.route.base_speed_kmh,
+            traffic_level=result.route.traffic_level,
+            traffic_multiplier=result.route.traffic_multiplier,
+            effective_speed_kmh=result.route.effective_speed_kmh,
+            travel_time_hours=result.route.travel_time_hours,
+            travel_time_minutes=result.route.travel_time_minutes,
+            random_delay_hours=result.route.random_delay_hours,
+            total_time_hours=result.route.total_time_hours,
+            total_time_minutes=result.route.total_time_minutes,
+        ),
+        warehouse=WarehouseDetail(
+            warehouse_id=result.warehouse.warehouse_id,
+            capacity=result.warehouse.capacity,
+            current_load=result.warehouse.current_load,
+            utilisation_pct=result.warehouse.utilisation_pct,
+            queue_position=result.warehouse.queue_position,
+            queue_wait_hours=result.warehouse.queue_wait_hours,
+            processing_hours=result.warehouse.processing_hours,
+            total_warehouse_hours=result.warehouse.total_warehouse_hours,
+            total_warehouse_minutes=result.warehouse.total_warehouse_minutes,
+        ),
+        total_hours=result.total_hours,
+        total_minutes=result.total_minutes,
+        delay_probability=result.delay_probability,
+        confidence=result.confidence,
+        summary=result.summary,
     )
