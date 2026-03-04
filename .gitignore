@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# VOXOPS — Project specific
+.env
+chroma_db/
+vector_store/
+data/tts_output/
+logs/
+*.db
+*.sqlite
+*.sqlite3
+models/
+.cache/

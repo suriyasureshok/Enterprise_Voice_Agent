@@ -1,0 +1,1 @@
+-- TODO Phase 2 — SQL schema: tables, indexes, constraints

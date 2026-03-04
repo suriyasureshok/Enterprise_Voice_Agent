@@ -1,0 +1,25 @@
+VOXOPS LOGISTICS — FREQUENTLY ASKED QUESTIONS
+
+Q: How do I track my shipment?
+A: Ask the voice agent "Where is my order?" followed by your order ID, or visit the web portal.
+
+Q: What does "in_transit" status mean?
+A: Your package has left the warehouse and is currently on route to the destination.
+
+Q: What does "delayed" status mean?
+A: Your package has encountered a delay due to traffic, weather, or processing issues. A revised ETA will be provided.
+
+Q: Can I change the delivery address after the order is placed?
+A: Address changes are possible before dispatch. Contact customer support immediately.
+
+Q: How long does an investigation for a missing package take?
+A: Investigations are opened within 24 hours and typically conclude within 5 business days.
+
+Q: Can the AI agent create a support ticket?
+A: Yes. Say "I need to speak to an agent" or "I want to file a complaint" to trigger an escalation.
+
+Q: What vehicles do you use for delivery?
+A: We operate a mixed fleet of vans, trucks, and motorcycles depending on package weight and route.
+
+Q: How is the estimated delivery time calculated?
+A: We use a logistics simulation engine that accounts for distance, vehicle speed, warehouse load, and real-time traffic conditions.

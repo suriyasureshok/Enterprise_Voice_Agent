@@ -1,0 +1,9 @@
+warehouse_id,city,capacity,current_load
+WH-001,New York,5000,3200
+WH-002,Chicago,4000,2100
+WH-003,Los Angeles,6000,4500
+WH-004,Houston,3500,1800
+WH-005,Phoenix,2500,900
+WH-006,Philadelphia,3000,2750
+WH-007,San Antonio,2000,1100
+WH-008,Seattle,4500,3000

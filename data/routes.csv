@@ -1,0 +1,9 @@
+route_id,origin,destination,distance,average_traffic
+RT-001,New York,Boston,350,medium
+RT-002,Chicago,Detroit,450,low
+RT-003,Los Angeles,San Francisco,600,high
+RT-004,Houston,Dallas,380,medium
+RT-005,Phoenix,Las Vegas,450,low
+RT-006,Philadelphia,New York,160,high
+RT-007,San Antonio,Austin,130,low
+RT-008,Seattle,Portland,280,medium
