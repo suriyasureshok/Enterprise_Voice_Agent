@@ -277,8 +277,8 @@ def process_query(
             "status": handoff.status,
         }
 
-    # 4. Response generation
-    response_text = generate_response(parsed.intent.value, data)
+    # 4. Response generation (pass original query for LLM context)
+    response_text = generate_response(parsed.intent.value, data, query=query)
 
     result = OrchestratorResult(
         transcript=query,

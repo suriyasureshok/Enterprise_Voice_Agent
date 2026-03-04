@@ -74,10 +74,17 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------
-    # LLM
+    # LLM — OpenRouter (free tier)
     # -------------------------------------------------
-    openai_api_key: str = Field(default="", description="OpenAI API key")
-    llm_model_name: str = Field(default="gpt-3.5-turbo")
+    openrouter_api_key: str = Field(default="", description="OpenRouter API key")
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1",
+        description="OpenRouter API base URL",
+    )
+    # Free models: mistralai/mistral-7b-instruct:free
+    #              meta-llama/llama-3.1-8b-instruct:free
+    #              google/gemma-3-12b-it:free
+    llm_model_name: str = Field(default="mistralai/mistral-7b-instruct:free")
     llm_temperature: float = Field(default=0.2)
     llm_max_tokens: int = Field(default=512)
 

@@ -6,12 +6,16 @@ Parses natural-language user queries to extract:
               faq, greeting, farewell, escalation, unknown)
   - entities (order_id, customer_id, city names, etc.)
 
-The parser uses keyword / regex heuristics so it works offline without an
-LLM and is fully deterministic and testable.
+Strategy (runtime selection):
+  1. OpenRouter LLM (mistral-7b-instruct:free by default) — used when the API
+     key is configured.  Provides rich NLU, JSON-structured output.
+  2. Keyword / regex heuristics — deterministic, zero-latency offline fallback.
+     Also used as a safety net if the LLM returns an invalid response.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -134,20 +138,89 @@ def _extract_entities(text: str) -> Dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# LLM-based intent classification (OpenRouter)
 # ---------------------------------------------------------------------------
 
-def parse_intent(query: str) -> ParsedIntent:
-    """
-    Parse a natural-language query and return the detected intent + entities.
+_VALID_INTENTS = {i.value for i in Intent}
 
-    The function iterates through all registered patterns, picks the match
-    with the **highest confidence**, and extracts entities from the raw text.
-    """
-    if not query or not query.strip():
-        return ParsedIntent(intent=Intent.UNKNOWN, confidence=0.0, raw_query=query)
+_LLM_SYSTEM_PROMPT = """\
+You are an intent classifier for VOXOPS, a logistics voice-AI gateway.
 
-    text = query.strip()
+Given a customer query, extract EXACTLY:
+  1. intent — one of:
+       shipment_status | delivery_prediction | complaint | reroute_request |
+       faq | greeting | farewell | escalation | unknown
+  2. confidence — float 0.0–1.0
+  3. entities — a JSON object with any of:
+       order_id (format: ORD-NNN), customer_id (CUST-NNN),
+       city, origin, destination
+
+Return ONLY valid JSON, no explanation, no markdown fences.
+Example:
+{"intent": "shipment_status", "confidence": 0.95, "entities": {"order_id": "ORD-042"}}
+"""
+
+
+def _llm_classify_intent(query: str) -> Optional[ParsedIntent]:
+    """
+    Call OpenRouter LLM to classify intent and extract entities.
+    Returns ``None`` on any error so the caller can fall back to regex.
+    """
+    try:
+        from src.voxops.utils.llm_client import complete, available
+
+        if not available():
+            return None
+
+        raw = complete(
+            system_prompt=_LLM_SYSTEM_PROMPT,
+            user_message=query,
+            temperature=0.0,
+            max_tokens=150,
+        )
+
+        # Strip accidental markdown fences
+        raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+
+        parsed = json.loads(raw)
+        intent_str  = str(parsed.get("intent", "unknown")).lower().strip()
+        confidence  = float(parsed.get("confidence", 0.75))
+        entities    = {k: str(v) for k, v in (parsed.get("entities") or {}).items()}
+
+        if intent_str not in _VALID_INTENTS:
+            logger.warning("LLM returned unknown intent '{}', discarding.", intent_str)
+            return None
+
+        # Always augment with regex-extracted entities (LLM may miss IDs)
+        merged_entities = _extract_entities(query)
+        merged_entities.update(entities)  # LLM entities take precedence
+
+        result = ParsedIntent(
+            intent=Intent(intent_str),
+            confidence=round(min(max(confidence, 0.0), 1.0), 3),
+            entities=merged_entities,
+            raw_query=query,
+        )
+        logger.debug(
+            "[LLM] Intent: {} (conf={:.2f}) | entities={}",
+            result.intent.value, result.confidence, result.entities,
+        )
+        return result
+
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        logger.warning("LLM intent parse failed (bad JSON): {}", exc)
+        return None
+    except Exception as exc:
+        logger.warning("LLM intent classification error (using regex fallback): {}", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Regex-based fallback classifier (no external dependencies)
+# ---------------------------------------------------------------------------
+
+def _regex_classify_intent(text: str) -> ParsedIntent:
+    """Pure-regex intent classification.  Always succeeds."""
     best_intent: Intent = Intent.UNKNOWN
     best_conf: float = 0.0
 
@@ -159,18 +232,45 @@ def parse_intent(query: str) -> ParsedIntent:
 
     entities = _extract_entities(text)
 
-    # Boost confidence if we found a matching entity for the intent
     if best_intent == Intent.SHIPMENT_STATUS and "order_id" in entities:
         best_conf = min(best_conf + 0.05, 1.0)
     if best_intent == Intent.REROUTE_REQUEST and ("city" in entities or "destination" in entities):
         best_conf = min(best_conf + 0.05, 1.0)
 
-    result = ParsedIntent(
+    return ParsedIntent(
         intent=best_intent,
         confidence=round(best_conf, 3),
         entities=entities,
         raw_query=text,
     )
 
-    logger.debug("Intent: {} (conf={:.2f}) | entities={}", result.intent.value, result.confidence, result.entities)
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def parse_intent(query: str) -> ParsedIntent:
+    """
+    Parse a natural-language query and return the detected intent + entities.
+
+    Pipeline:
+      1. Try OpenRouter LLM (best accuracy, works even with novel phrasing).
+      2. Fall back to regex heuristics (offline, zero-latency).
+    """
+    if not query or not query.strip():
+        return ParsedIntent(intent=Intent.UNKNOWN, confidence=0.0, raw_query=query)
+
+    text = query.strip()
+
+    # --- LLM primary ---
+    llm_result = _llm_classify_intent(text)
+    if llm_result is not None:
+        return llm_result
+
+    # --- Regex fallback ---
+    result = _regex_classify_intent(text)
+    logger.debug(
+        "[Regex] Intent: {} (conf={:.2f}) | entities={}",
+        result.intent.value, result.confidence, result.entities,
+    )
     return result

@@ -5,15 +5,105 @@ Converts structured system outputs (order data, simulation results,
 RAG context, handoff confirmations) into natural-language text
 suitable for TTS playback.
 
-Each intent has a dedicated formatter.  The public ``generate_response``
-function dispatches to the correct one based on the intent string.
+Strategy:
+  1. OpenRouter LLM — generates a natural, contextual voice response when
+     the API key is configured.  The structured data is injected as context.
+  2. Template formatters — deterministic fallback for every intent.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Optional
 
 from loguru import logger
+
+
+# ---------------------------------------------------------------------------
+# LLM-based response generation (OpenRouter)
+# ---------------------------------------------------------------------------
+
+_LLM_RESPONSE_SYSTEM = """\
+You are VOXOPS, a professional logistics AI voice assistant.
+Given the user's intent, data retrieved from our systems, and any relevant
+context, generate a natural, concise voice response (1-3 sentences max).
+
+Rules:
+- Speak directly to the customer in a warm but professional tone.
+- Never say "JSON" or mention internal field names.
+- If escalation happened, mention the ticket ID and reassure the customer.
+- If data is missing, politely apologise and ask for clarification.
+- Output ONLY the spoken response text. No lists, no markdown.
+"""
+
+
+def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -> Optional[str]:
+    """
+    Ask the LLM to produce a natural voice response.
+    Returns ``None`` on any failure so caller falls back to templates.
+    """
+    try:
+        from src.voxops.utils.llm_client import complete, available
+
+        if not available():
+            return None
+
+        # Build a concise user message with structured context
+        context_parts = [f"Customer intent: {intent}"]
+        if query:
+            context_parts.append(f"Customer said: \"{query}\"")
+
+        # Serialise key data fields in a readable way
+        data_summary = {}
+        if data.get("order"):
+            o = data["order"]
+            data_summary["order"] = {
+                "id": o.get("order_id"),
+                "status": o.get("status"),
+                "from": o.get("origin"),
+                "to": o.get("destination"),
+            }
+        if data.get("prediction"):
+            p = data["prediction"]
+            data_summary["prediction"] = {
+                "order_id": p.get("order_id"),
+                "eta_hours": round(p.get("total_hours", 0), 1),
+                "delay_probability_pct": round(p.get("delay_probability", 0) * 100),
+                "summary": p.get("summary", ""),
+            }
+        if data.get("ticket"):
+            t = data["ticket"]
+            data_summary["ticket"] = {
+                "id": t.get("ticket_id"),
+                "priority": t.get("priority"),
+            }
+        if data.get("rag_context"):
+            data_summary["knowledge_base_excerpt"] = data["rag_context"][:400]
+        if data.get("order_id") and not data_summary.get("order"):
+            data_summary["searched_order_id"] = data["order_id"]
+            data_summary["order_found"] = False
+
+        if data_summary:
+            context_parts.append("System data: " + json.dumps(data_summary, default=str))
+
+        user_msg = "\n".join(context_parts)
+
+        response = complete(
+            system_prompt=_LLM_RESPONSE_SYSTEM,
+            user_message=user_msg,
+            temperature=0.4,
+            max_tokens=180,
+        )
+        # Strip surrounding quotes if the model included them
+        response = response.strip().strip('"').strip("'")
+        if response:
+            logger.debug("[LLM] Response: '{}'...", response[:100])
+            return response
+        return None
+
+    except Exception as exc:
+        logger.warning("LLM response generation failed (using template fallback): {}", exc)
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -149,9 +239,13 @@ _FORMATTERS = {
 }
 
 
-def generate_response(intent: str, data: Dict[str, Any] | None = None) -> str:
+def generate_response(intent: str, data: Dict[str, Any] | None = None, query: str = "") -> str:
     """
     Generate a natural-language response for a given intent and data payload.
+
+    Pipeline:
+      1. Try OpenRouter LLM for a rich, contextual voice response.
+      2. Fall back to deterministic template formatters.
 
     Parameters
     ----------
@@ -159,6 +253,8 @@ def generate_response(intent: str, data: Dict[str, Any] | None = None) -> str:
         Detected intent string (matches ``Intent`` enum values).
     data : dict
         Structured data from the orchestrator (order info, prediction, ticket, etc.).
+    query : str, optional
+        Original user query for LLM context.
 
     Returns
     -------
@@ -166,7 +262,14 @@ def generate_response(intent: str, data: Dict[str, Any] | None = None) -> str:
         TTS-ready natural-language response.
     """
     data = data or {}
+
+    # --- LLM primary ---
+    llm_response = _llm_generate_response(intent, data, query)
+    if llm_response:
+        return llm_response
+
+    # --- Template fallback ---
     formatter = _FORMATTERS.get(intent, _fmt_unknown)
     response = formatter(data)
-    logger.debug("Generated response for intent '{}': {}…", intent, response[:120])
+    logger.debug("[Template] Response for intent '{}': {}…", intent, response[:120])
     return response
