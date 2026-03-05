@@ -7,3 +7,25 @@ RT-005,Phoenix,Las Vegas,450,low
 RT-006,Philadelphia,New York,160,high
 RT-007,San Antonio,Austin,130,low
 RT-008,Seattle,Portland,280,medium
+RT-009,Miami,Orlando,380,medium
+RT-010,Denver,Salt Lake City,820,low
+RT-011,Atlanta,Charlotte,400,medium
+RT-012,Boston,Hartford,160,low
+RT-013,Dallas,San Antonio,420,medium
+RT-014,Minneapolis,Milwaukee,530,low
+RT-015,San Francisco,Sacramento,145,high
+RT-016,Nashville,Memphis,340,low
+RT-017,Tampa,Jacksonville,320,medium
+RT-018,Portland,Seattle,280,medium
+RT-019,Charlotte,Raleigh,250,low
+RT-020,Detroit,Cleveland,270,medium
+RT-021,New York,Philadelphia,160,high
+RT-022,Los Angeles,Las Vegas,430,medium
+RT-023,Chicago,Minneapolis,660,low
+RT-024,Houston,New Orleans,560,medium
+RT-025,Miami,Atlanta,1070,high
+RT-026,Denver,Phoenix,940,low
+RT-027,Boston,New York,350,high
+RT-028,Dallas,Houston,380,medium
+RT-029,San Diego,Los Angeles,190,high
+RT-030,Austin,Houston,260,low

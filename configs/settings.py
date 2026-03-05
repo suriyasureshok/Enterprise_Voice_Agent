@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Speech-to-Text (Whisper)
     # -------------------------------------------------
     whisper_model_size: str = Field(
-        default="base",
+        default="small",
         description="Whisper model size: tiny | base | small | medium | large",
     )
 
@@ -74,17 +74,16 @@ class Settings(BaseSettings):
     )
 
     # -------------------------------------------------
-    # LLM — OpenRouter (free tier)
+    # LLM — Google Gemini (primary) / OpenRouter (fallback)
     # -------------------------------------------------
+    gemini_api_key: str = Field(default="", description="Google Gemini API key")
+    gemini_model_name: str = Field(default="gemini-2.0-flash", description="Gemini model")
     openrouter_api_key: str = Field(default="", description="OpenRouter API key")
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1",
         description="OpenRouter API base URL",
     )
-    # Free models: mistralai/mistral-7b-instruct:free
-    #              meta-llama/llama-3.1-8b-instruct:free
-    #              google/gemma-3-12b-it:free
-    llm_model_name: str = Field(default="mistralai/mistral-7b-instruct:free")
+    llm_model_name: str = Field(default="meta-llama/llama-3.2-3b-instruct:free")
     llm_temperature: float = Field(default=0.2)
     llm_max_tokens: int = Field(default=512)
 

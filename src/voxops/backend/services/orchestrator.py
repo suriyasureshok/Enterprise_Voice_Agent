@@ -114,8 +114,13 @@ def _run_simulation(db: Session, order_id: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def _retrieve_rag_context(query: str, top_k: int = 3) -> str:
-    """Get relevant context from the RAG knowledge base (best-effort)."""
+def _retrieve_rag_context(query: str, top_k: int = 3) -> dict:
+    """Get relevant context from the RAG knowledge base (best-effort).
+
+    Returns a dict with:
+      - ``best_passage``: the single most relevant chunk (for template fallback)
+      - ``full_context``: all top-k chunks joined (for LLM context)
+    """
     try:
         from src.voxops.rag.retriever import Retriever
 
@@ -123,10 +128,17 @@ def _retrieve_rag_context(query: str, top_k: int = 3) -> str:
         # Auto-ingest if the store is empty
         if retriever.store_count() == 0:
             retriever.ingest_knowledge_base()
-        return retriever.retrieve_context_string(query, top_k=top_k)
+        result = retriever.retrieve(query, top_k=top_k)
+        best = result.passages[0].text.strip() if result.passages else ""
+        best_distance = result.passages[0].distance if result.passages else 999.0
+        return {
+            "best_passage": best,
+            "full_context": result.context_text,
+            "best_distance": best_distance,
+        }
     except Exception as exc:
         logger.warning("RAG retrieval failed (non-fatal): {}", exc)
-        return ""
+        return {"best_passage": "", "full_context": "", "best_distance": 999.0}
 
 
 # ---------------------------------------------------------------------------
@@ -139,28 +151,48 @@ _ESCALATION_INTENTS = {Intent.COMPLAINT, Intent.ESCALATION, Intent.REROUTE_REQUE
 def _handle_shipment_status(
     parsed: ParsedIntent, db: Session, data: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Fetch order info for shipment status queries."""
+    """Fetch order info for shipment status queries.
+
+    If no order_id is present the user is asking a *general* tracking
+    question (e.g. "How do I track my shipment?").  In that case we
+    fall back to the RAG knowledge base so the FAQ handler can answer.
+    """
     order_id = parsed.entities.get("order_id")
     if order_id:
         order = _fetch_order(db, order_id)
         data["order"] = order
         data["order_id"] = order_id
     else:
+        # No specific order → treat as FAQ / general question
         data["order"] = None
         data["order_id"] = None
+        data["_fallback_to_faq"] = True
+        rag = _retrieve_rag_context(parsed.raw_query)
+        data["rag_context"] = rag["full_context"]
+        data["rag_best_passage"] = rag["best_passage"]
+        data["rag_best_distance"] = rag["best_distance"]
     return data
 
 
 def _handle_delivery_prediction(
     parsed: ParsedIntent, db: Session, data: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Run simulation for delivery prediction queries."""
+    """Run simulation for delivery prediction queries.
+
+    Without an order_id this is a general question about delivery times,
+    so fall back to the RAG knowledge base.
+    """
     order_id = parsed.entities.get("order_id")
     if order_id:
         prediction = _run_simulation(db, order_id)
         data["prediction"] = prediction
     else:
         data["prediction"] = None
+        data["_fallback_to_faq"] = True
+        rag = _retrieve_rag_context(parsed.raw_query)
+        data["rag_context"] = rag["full_context"]
+        data["rag_best_passage"] = rag["best_passage"]
+        data["rag_best_distance"] = rag["best_distance"]
     return data
 
 
@@ -188,8 +220,10 @@ def _handle_faq(
     parsed: ParsedIntent, db: Session, data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Retrieve RAG context for FAQ-like queries."""
-    context = _retrieve_rag_context(parsed.raw_query)
-    data["rag_context"] = context
+    rag = _retrieve_rag_context(parsed.raw_query)
+    data["rag_context"] = rag["full_context"]
+    data["rag_best_passage"] = rag["best_passage"]
+    data["rag_best_distance"] = rag["best_distance"]
     return data
 
 
@@ -197,8 +231,10 @@ def _handle_unknown(
     parsed: ParsedIntent, db: Session, data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Fallback: try RAG retrieval for unrecognised queries."""
-    context = _retrieve_rag_context(parsed.raw_query)
-    data["rag_context"] = context
+    rag = _retrieve_rag_context(parsed.raw_query)
+    data["rag_context"] = rag["full_context"]
+    data["rag_best_passage"] = rag["best_passage"]
+    data["rag_best_distance"] = rag["best_distance"]
     return data
 
 
@@ -245,15 +281,15 @@ def process_query(
     """
     logger.info("Orchestrator processing: '{}'", query[:120])
 
-    # 1. Intent detection
-    parsed = parse_intent(query)
+    # 1. Intent detection (with history for contextual follow-ups)
+    parsed = parse_intent(query, conversation_history=conversation_history)
 
     # merge supplied customer_id into entities
     if customer_id and "customer_id" not in parsed.entities:
         parsed.entities["customer_id"] = customer_id
 
     # 2. Data retrieval (intent-specific)
-    data: Dict[str, Any] = {}
+    data: Dict[str, Any] = {"_user_query": query}
     handler = _INTENT_HANDLERS.get(parsed.intent, _handle_unknown)
     data = handler(parsed, db, data)
 
@@ -277,8 +313,8 @@ def process_query(
             "status": handoff.status,
         }
 
-    # 4. Response generation (pass original query for LLM context)
-    response_text = generate_response(parsed.intent.value, data, query=query)
+    # 4. Response generation (pass original query + history for LLM context)
+    response_text = generate_response(parsed.intent.value, data, query=query, conversation_history=conversation_history)
 
     result = OrchestratorResult(
         transcript=query,

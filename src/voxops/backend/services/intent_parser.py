@@ -110,7 +110,9 @@ _ORDER_ID_RE   = re.compile(r"\b(ORD-\d{3,})\b", re.IGNORECASE)
 _CUSTOMER_ID_RE = re.compile(r"\b(CUST-\d{3,})\b", re.IGNORECASE)
 _CITY_RE        = re.compile(
     r"\b(New York|Los Angeles|Chicago|Houston|Dallas|Miami|Atlanta|Denver|Seattle|Phoenix"
-    r"|San Francisco|Boston|Portland|Detroit|Minneapolis)\b",
+    r"|San Francisco|Boston|Portland|Detroit|Minneapolis|Philadelphia|San Antonio|Austin"
+    r"|Nashville|Tampa|Charlotte|Las Vegas|San Diego|Jacksonville|Memphis|Orlando"
+    r"|Salt Lake City|Hartford|Milwaukee|Cleveland|Raleigh|Sacramento|New Orleans)\b",
     re.IGNORECASE,
 )
 
@@ -146,7 +148,8 @@ _VALID_INTENTS = {i.value for i in Intent}
 _LLM_SYSTEM_PROMPT = """\
 You are an intent classifier for VOXOPS, a logistics voice-AI gateway.
 
-Given a customer query, extract EXACTLY:
+Given a customer query (and optionally recent conversation history for context),
+extract EXACTLY:
   1. intent — one of:
        shipment_status | delivery_prediction | complaint | reroute_request |
        faq | greeting | farewell | escalation | unknown
@@ -155,34 +158,83 @@ Given a customer query, extract EXACTLY:
        order_id (format: ORD-NNN), customer_id (CUST-NNN),
        city, origin, destination
 
-Return ONLY valid JSON, no explanation, no markdown fences.
+CONTEXT RULES:
+- If the user says something vague like "what about that order" or "tell me more"
+  or "and the other one?", use the conversation history to resolve references.
+- Carry forward entities (order_id, city, etc.) from previous turns when the
+  current query refers to them implicitly.
+- If the user asks a follow-up question, infer the intent from the ongoing topic.
+
+IMPORTANT: Return ONLY a single JSON object. No explanation, no markdown fences,
+no thinking, no reasoning. Just the raw JSON.
 Example:
 {"intent": "shipment_status", "confidence": 0.95, "entities": {"order_id": "ORD-042"}}
 """
 
+_JSON_EXTRACT_RE = re.compile(r'\{[^{}]*"intent"\s*:\s*"[^"]*"[^{}]*\}', re.DOTALL)
 
-def _llm_classify_intent(query: str) -> Optional[ParsedIntent]:
+
+def _extract_json_from_text(text: str) -> Optional[dict]:
+    """Try to extract a JSON object from possibly verbose LLM output."""
+    # Strip <think>...</think> blocks (closed or unclosed) some models produce
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL).strip()
+
+    # First, try direct parse
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Strip markdown fences
+    cleaned = text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    try:
+        return json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Extract JSON from within reasoning text
+    m = _JSON_EXTRACT_RE.search(text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return None
+
+
+def _llm_classify_intent(query: str, conversation_history: Optional[list] = None) -> Optional[ParsedIntent]:
     """
-    Call OpenRouter LLM to classify intent and extract entities.
+    Call LLM to classify intent and extract entities.
+    Uses conversation history for contextual follow-ups.
     Returns ``None`` on any error so the caller can fall back to regex.
     """
     try:
-        from src.voxops.utils.llm_client import complete, available
+        from src.voxops.utils.llm_client import chat_complete_sync, available
 
         if not available():
             return None
 
-        raw = complete(
-            system_prompt=_LLM_SYSTEM_PROMPT,
-            user_message=query,
+        # Build message list with history for contextual understanding
+        messages = [{"role": "system", "content": _LLM_SYSTEM_PROMPT}]
+        if conversation_history:
+            for h in conversation_history[-6:]:
+                messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": query})
+
+        raw = chat_complete_sync(
+            messages,
             temperature=0.0,
-            max_tokens=150,
+            max_tokens=400,
         )
 
-        # Strip accidental markdown fences
-        raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+        # Extract JSON from possibly verbose LLM output
+        parsed = _extract_json_from_text(raw)
+        if parsed is None:
+            logger.warning("LLM returned non-JSON response: {}", raw[:200])
+            return None
 
-        parsed = json.loads(raw)
         intent_str  = str(parsed.get("intent", "unknown")).lower().strip()
         confidence  = float(parsed.get("confidence", 0.75))
         entities    = {k: str(v) for k, v in (parsed.get("entities") or {}).items()}
@@ -249,12 +301,12 @@ def _regex_classify_intent(text: str) -> ParsedIntent:
 # Public API
 # ---------------------------------------------------------------------------
 
-def parse_intent(query: str) -> ParsedIntent:
+def parse_intent(query: str, conversation_history: Optional[list] = None) -> ParsedIntent:
     """
     Parse a natural-language query and return the detected intent + entities.
 
     Pipeline:
-      1. Try OpenRouter LLM (best accuracy, works even with novel phrasing).
+      1. Try LLM (best accuracy, uses conversation history for context).
       2. Fall back to regex heuristics (offline, zero-latency).
     """
     if not query or not query.strip():
@@ -263,7 +315,7 @@ def parse_intent(query: str) -> ParsedIntent:
     text = query.strip()
 
     # --- LLM primary ---
-    llm_result = _llm_classify_intent(text)
+    llm_result = _llm_classify_intent(text, conversation_history=conversation_history)
     if llm_result is not None:
         return llm_result
 

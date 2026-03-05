@@ -32,7 +32,7 @@ _connect_args = (
 engine = create_engine(
     settings.database_url,
     connect_args=_connect_args,
-    echo=settings.debug,                   # SQL logging in debug mode
+    echo=False,                            # Set True to enable SQL logging
     future=True,
 )
 

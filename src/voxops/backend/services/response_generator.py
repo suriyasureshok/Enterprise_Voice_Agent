@@ -24,26 +24,48 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 
 _LLM_RESPONSE_SYSTEM = """\
-You are VOXOPS, a professional logistics AI voice assistant.
-Given the user's intent, data retrieved from our systems, and any relevant
-context, generate a natural, concise voice response (1-3 sentences max).
+You are VOXOPS, a friendly and professional logistics AI voice assistant
+on a live phone call with a customer.
 
-Rules:
-- Speak directly to the customer in a warm but professional tone.
-- Never say "JSON" or mention internal field names.
+Your personality:
+- Warm, empathetic, and conversational — like a real customer service agent.
+- You actively listen and engage. You ask follow-up questions naturally.
+- You confirm understanding before moving on.
+
+Conversation rules:
+- After answering, ask a relevant follow-up question to keep the
+  conversation flowing (e.g., "Is there anything else about this order?",
+  "Would you like me to check something else?", "Can I help with anything
+  else today?").
+- If the user's request is vague or unclear, ask a clarifying question
+  instead of guessing (e.g., "Could you give me the order number?",
+  "Which city would you like to reroute to?").
+- If data is missing from the system, politely apologise and ask the
+  customer for more details.
+- Use the conversation history to maintain context. Reference previous
+  topics naturally (e.g., "Going back to your order…", "As I mentioned…").
+- Keep responses concise for voice (2-4 sentences). Sound natural, not
+  robotic.
+
+Strict rules:
+- Never say "JSON", mention field names, or expose internal system details.
 - If escalation happened, mention the ticket ID and reassure the customer.
-- If data is missing, politely apologise and ask for clarification.
-- Output ONLY the spoken response text. No lists, no markdown.
+- Output ONLY the spoken response text. No lists, no markdown, no bullet
+  points.
+- Do NOT use <think> tags, reasoning blocks, or chain-of-thought.
+- For FAQ / knowledge-base questions, answer the specific question asked.
+  Do NOT recite or summarize the entire context — pick the most relevant
+  fact and reply concisely, then ask if they need more details.
 """
 
 
-def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -> Optional[str]:
+def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "", conversation_history: Optional[list] = None) -> Optional[str]:
     """
     Ask the LLM to produce a natural voice response.
     Returns ``None`` on any failure so caller falls back to templates.
     """
     try:
-        from src.voxops.utils.llm_client import complete, available
+        from src.voxops.utils.llm_client import chat_complete_sync, available
 
         if not available():
             return None
@@ -78,7 +100,13 @@ def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -
                 "priority": t.get("priority"),
             }
         if data.get("rag_context"):
-            data_summary["knowledge_base_excerpt"] = data["rag_context"][:400]
+            # Send only the best-matching passage to the LLM, not the full dump
+            best = data.get("rag_best_passage", "")
+            if not best:
+                best = data["rag_context"].split("\n\n---\n\n")[0]
+                if best.startswith("[Source:"):
+                    best = best.split("\n", 1)[-1].strip()
+            data_summary["knowledge_base_excerpt"] = best[:500]
         if data.get("order_id") and not data_summary.get("order"):
             data_summary["searched_order_id"] = data["order_id"]
             data_summary["order_found"] = False
@@ -88,14 +116,25 @@ def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -
 
         user_msg = "\n".join(context_parts)
 
-        response = complete(
-            system_prompt=_LLM_RESPONSE_SYSTEM,
-            user_message=user_msg,
+        # Build message list with conversation history for context
+        messages = [{"role": "system", "content": _LLM_RESPONSE_SYSTEM}]
+        # Inject up to last 10 turns of conversation history
+        if conversation_history:
+            for h in conversation_history[-10:]:
+                messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": user_msg})
+
+        response = chat_complete_sync(
+            messages,
             temperature=0.4,
-            max_tokens=180,
+            max_tokens=300,
         )
+        # Strip <think>...</think> blocks (closed or unclosed) some models produce
+        import re as _re
+        response = _re.sub(r'<think>.*?</think>', '', response, flags=_re.DOTALL).strip()
+        response = _re.sub(r'<think>.*', '', response, flags=_re.DOTALL).strip()
         # Strip surrounding quotes if the model included them
-        response = response.strip().strip('"').strip("'")
+        response = response.strip('"').strip("'")
         if response:
             logger.debug("[LLM] Response: '{}'...", response[:100])
             return response
@@ -111,10 +150,16 @@ def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -
 # ---------------------------------------------------------------------------
 
 def _fmt_shipment_status(data: Dict[str, Any]) -> str:
+    # If no order_id was given, this is a general tracking question — use RAG
+    if data.get("_fallback_to_faq"):
+        return _fmt_faq(data)
+
     order = data.get("order")
     if not order:
-        order_id = data.get("order_id", "your order")
-        return f"I'm sorry, I couldn't find an order with ID {order_id}. Please double-check and try again."
+        order_id = data.get("order_id", "")
+        if order_id:
+            return f"I'm sorry, I couldn't find an order with ID {order_id}. Please double-check and try again."
+        return "Could you please provide your order ID so I can look up the status? For example, ORD-001."
 
     oid = order.get("order_id", "unknown")
     status = order.get("status", "unknown")
@@ -133,9 +178,13 @@ def _fmt_shipment_status(data: Dict[str, Any]) -> str:
 
 
 def _fmt_delivery_prediction(data: Dict[str, Any]) -> str:
+    # If no order_id was given, this is a general question — use RAG
+    if data.get("_fallback_to_faq"):
+        return _fmt_faq(data)
+
     pred = data.get("prediction")
     if not pred:
-        return "I'm sorry, I couldn't generate a delivery prediction for that order."
+        return "I'd be happy to predict a delivery time. Could you please provide the order ID?"
 
     oid = pred.get("order_id", "your order")
     total_h = pred.get("total_hours", 0)
@@ -188,10 +237,117 @@ def _fmt_reroute(data: Dict[str, Any]) -> str:
     return "To process a reroute request, please provide the order ID and the new delivery address."
 
 
+def _clean_rag_passage(raw: str, user_query: str = "") -> str:
+    """Clean a raw RAG passage into a TTS-friendly response.
+
+    - Strips document headers (e.g. 'VOXOPS LOGISTICS — ...')
+    - Extracts just the A: answer if the chunk is a Q/A pair
+    - Removes section numbering like '3. MISSING PACKAGES'
+    - Handles mid-sentence starts from chunk overlap
+    - Caps length at ~300 chars
+    """
+    import re
+
+    text = raw.strip()
+    if not text:
+        return ""
+
+    # Remove common doc headers — match known titles only to avoid eating Q: pairs
+    text = re.sub(
+        r"^VOXOPS LOGISTICS\s*[—–-]\s*"
+        r"(?:FREQUENTLY\s+ASKED\s+QUESTIONS|COMPANY\s+POLICIES|[A-Z ]+)\s*",
+        "", text, flags=re.IGNORECASE
+    ).strip()
+
+    # Also strip a standalone all-caps title line at the start
+    text = re.sub(r"^[A-Z ]{10,}\n+", "", text).strip()
+
+    # If the text contains Q:/A: pairs, find the most relevant answer
+    qa_pairs = re.findall(r"Q:\s*(.+?)\nA:\s*(.+?)(?=\nQ:|\Z)", text, re.DOTALL)
+    if qa_pairs:
+        # Find the Q/A pair most relevant to the user query
+        if user_query:
+            query_words = set(user_query.lower().split())
+            best_score, best_answer = -1, ""
+            for q, a in qa_pairs:
+                q_words = set(q.lower().split())
+                overlap = len(query_words & q_words)
+                if overlap > best_score:
+                    best_score = overlap
+                    best_answer = a.strip()
+            if best_answer:
+                return best_answer[:300]
+        # Fallback: return first answer
+        return qa_pairs[0][1].strip()[:300]
+
+    # --- Company-policy style text ---
+
+    # Strip ALL numbered section headers like '3. MISSING PACKAGES\n' or '4. DAMAGED GOODS'
+    text = re.sub(r"\d+\.\s+[A-Z][A-Z /&-]+\s*\n?", "", text).strip()
+
+    # Remove leading partial sentences (from chunk overlap):
+    # if text doesn't start with uppercase letter, bullet, or dash
+    if text and not text[0].isupper() and text[0] not in "-•*":
+        # Find the end of the partial sentence and skip to next sentence
+        m = re.search(r"[.!?]\s+([A-Z\-•*])", text)
+        if m:
+            text = text[m.start() + 2:].strip()
+        else:
+            # No clear sentence boundary — try to skip to first bullet
+            m2 = re.search(r"\n\s*[-•*]", text)
+            if m2:
+                text = text[m2.start():].strip()
+
+    # Clean up bullet dashes into prose
+    lines = text.split("\n")
+    cleaned_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        # Strip leading bullet (dash, asterisk, bullet point)
+        line = re.sub(r"^[-•*]\s*", "", line).strip()
+        if line:
+            cleaned_lines.append(line)
+
+    text = ". ".join(cleaned_lines)
+
+    # Collapse multiple periods / spaces
+    text = re.sub(r"\.\s*\.", ".", text)
+    text = re.sub(r"\s{2,}", " ", text)
+
+    if len(text) > 300:
+        text = text[:300].rsplit(" ", 1)[0] + "…"
+
+    return text
+
+
+# Maximum L2 distance from ChromaDB above which a passage is considered irrelevant
+_RAG_RELEVANCE_THRESHOLD = 0.55
+
+
 def _fmt_faq(data: Dict[str, Any]) -> str:
-    context = data.get("rag_context", "")
-    if context:
-        return f"Based on our knowledge base: {context}"
+    # Check relevance first — if the best passage is too distant, don't use it
+    distance = data.get("rag_best_distance", 0.0)
+    if distance > _RAG_RELEVANCE_THRESHOLD:
+        return (
+            "I'm sorry, I don't have specific information about that in our knowledge base. "
+            "Would you like me to connect you with a human agent?"
+        )
+
+    # Use the single best-matching passage (not the full RAG dump)
+    best = data.get("rag_best_passage", "").strip()
+    if not best:
+        # Fallback to rag_context, but only the first passage
+        full = data.get("rag_context", "")
+        if full:
+            best = full.split("\n\n---\n\n")[0]  # take first chunk only
+            # Strip the "[Source: ...]" header if present
+            if best.startswith("[Source:"):
+                best = best.split("\n", 1)[-1].strip()
+    if best:
+        query = data.get("_user_query", "")
+        return _clean_rag_passage(best, query)
     return "I don't have specific information about that. Would you like me to connect you with an agent?"
 
 
@@ -212,9 +368,28 @@ def _fmt_farewell(_: Dict[str, Any]) -> str:
 
 
 def _fmt_unknown(data: Dict[str, Any]) -> str:
-    context = data.get("rag_context", "")
-    if context:
-        return f"Here's what I found that may help: {context}"
+    # Check relevance first
+    distance = data.get("rag_best_distance", 0.0)
+    if distance > _RAG_RELEVANCE_THRESHOLD:
+        return (
+            "I'm not sure I understood your request. You can ask me about "
+            "shipment tracking, delivery predictions, or company policies. "
+            "Would you like to try again?"
+        )
+
+    # Use best passage only — same logic as FAQ to avoid dumping everything
+    best = data.get("rag_best_passage", "").strip()
+    if not best:
+        full = data.get("rag_context", "")
+        if full:
+            best = full.split("\n\n---\n\n")[0]
+            if best.startswith("[Source:"):
+                best = best.split("\n", 1)[-1].strip()
+    if best:
+        query = data.get("_user_query", "")
+        cleaned = _clean_rag_passage(best, query)
+        if cleaned:
+            return f"Here's what I found: {cleaned}"
     return (
         "I'm not sure I understood your request. You can ask me about "
         "shipment tracking, delivery predictions, or company policies. "
@@ -239,7 +414,7 @@ _FORMATTERS = {
 }
 
 
-def generate_response(intent: str, data: Dict[str, Any] | None = None, query: str = "") -> str:
+def generate_response(intent: str, data: Dict[str, Any] | None = None, query: str = "", conversation_history: Optional[list] = None) -> str:
     """
     Generate a natural-language response for a given intent and data payload.
 
@@ -264,7 +439,7 @@ def generate_response(intent: str, data: Dict[str, Any] | None = None, query: st
     data = data or {}
 
     # --- LLM primary ---
-    llm_response = _llm_generate_response(intent, data, query)
+    llm_response = _llm_generate_response(intent, data, query, conversation_history=conversation_history)
     if llm_response:
         return llm_response
 

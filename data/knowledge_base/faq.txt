@@ -9,6 +9,12 @@ A: Your package has left the warehouse and is currently on route to the destinat
 Q: What does "delayed" status mean?
 A: Your package has encountered a delay due to traffic, weather, or processing issues. A revised ETA will be provided.
 
+Q: What does "pending" status mean?
+A: Your order has been received and confirmed, but has not yet been dispatched from the warehouse. It is in the queue for processing.
+
+Q: What does "cancelled" status mean?
+A: Your order has been cancelled either by your request or due to a processing issue. Refunds are processed within 3–5 business days.
+
 Q: Can I change the delivery address after the order is placed?
 A: Address changes are possible before dispatch. Contact customer support immediately.
 
@@ -19,7 +25,43 @@ Q: Can the AI agent create a support ticket?
 A: Yes. Say "I need to speak to an agent" or "I want to file a complaint" to trigger an escalation.
 
 Q: What vehicles do you use for delivery?
-A: We operate a mixed fleet of vans, trucks, and motorcycles depending on package weight and route.
+A: We operate a mixed fleet of vans, trucks, and motorcycles depending on package weight and route. Our fleet includes 25 active vehicles.
 
 Q: How is the estimated delivery time calculated?
 A: We use a logistics simulation engine that accounts for distance, vehicle speed, warehouse load, and real-time traffic conditions.
+
+Q: What cities do you deliver to?
+A: We currently serve major metro areas including New York, Chicago, Los Angeles, Houston, Phoenix, Philadelphia, San Antonio, Seattle, Miami, Denver, Atlanta, Boston, Dallas, Minneapolis, San Francisco, Nashville, Tampa, Portland, Charlotte, Detroit, Las Vegas, Austin, Memphis, San Diego, and Jacksonville.
+
+Q: How many warehouses does VoxOps have?
+A: We operate 20 distribution centres across the United States, located in all major metropolitan areas.
+
+Q: Can I get same-day delivery?
+A: Same-day delivery is available in select metro areas for orders placed before 10 AM local time. An express surcharge applies.
+
+Q: What happens if traffic is heavy on my route?
+A: Our predictive system accounts for traffic in real time. If traffic conditions change, we automatically recalculate the ETA and notify you.
+
+Q: How do I file a complaint about damaged goods?
+A: Say "I want to file a complaint" or "My package was damaged" to the voice agent. You can also use the web portal. Be sure to document damage with photos within 48 hours.
+
+Q: Can I reroute my package after it has shipped?
+A: Post-dispatch rerouting may be possible but could incur a fee of up to $25. Contact support as soon as possible.
+
+Q: How do I cancel an order?
+A: Orders in "pending" status can be cancelled at no charge. Orders already in transit may incur cancellation fees. Contact support with your order ID.
+
+Q: What are your business hours?
+A: Our AI agent is available 24/7. Human agents are available Monday through Friday, 8 AM to 8 PM EST, and Saturday 9 AM to 5 PM EST.
+
+Q: How do I contact a human agent?
+A: Say "I want to speak to a human" or "Transfer me to an agent" and the system will create a support ticket and escalate your issue.
+
+Q: Can I track multiple orders at once?
+A: Yes, you can ask "Show me all my orders" or visit the Orders page in the web portal to see all shipments.
+
+Q: What is the maximum package weight you accept?
+A: Standard shipments accept packages up to 70 lbs (32 kg). For heavier items, contact our freight department.
+
+Q: Do you offer international shipping?
+A: Currently we operate within the continental United States. International shipping is planned for future expansion.

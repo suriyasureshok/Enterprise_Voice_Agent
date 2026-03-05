@@ -86,8 +86,8 @@ foreach ($line in $EnvContent) {
 # ── Start server ──────────────────────────────────────────────
 Write-Host ""
 Write-Host "[*] Starting VOXOPS backend on http://localhost:$Port" -ForegroundColor Cyan
-Write-Host "    Voice client : file://$(Join-Path $ProjectRoot 'frontend\voice_client\index.html')" -ForegroundColor DarkCyan
-Write-Host "    Agent dashboard: file://$(Join-Path $ProjectRoot 'frontend\agent_dashboard\dashboard.html')" -ForegroundColor DarkCyan
+Write-Host "    Dashboard: http://localhost:${Port}/dashboard/" -ForegroundColor DarkCyan
+Write-Host "    Health:    http://localhost:${Port}/health" -ForegroundColor DarkCyan
 Write-Host "    Press Ctrl+C to stop." -ForegroundColor DarkGray
 Write-Host ""
 

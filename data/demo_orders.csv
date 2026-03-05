@@ -7,3 +7,45 @@ ORD-005,CUST-105,Phoenix,Las Vegas,VEH-05,450,delayed,2026-03-03T07:00:00
 ORD-006,CUST-106,Philadelphia,New York,VEH-06,160,delivered,2026-03-03T08:30:00
 ORD-007,CUST-107,San Antonio,Austin,VEH-07,130,in_transit,2026-03-03T09:00:00
 ORD-008,CUST-108,Seattle,Portland,VEH-08,280,pending,2026-03-04T06:00:00
+ORD-009,CUST-109,Miami,Orlando,VEH-09,380,in_transit,2026-03-01T07:15:00
+ORD-010,CUST-110,Denver,Salt Lake City,VEH-10,820,pending,2026-03-01T10:00:00
+ORD-011,CUST-111,Atlanta,Charlotte,VEH-11,400,delayed,2026-03-01T12:30:00
+ORD-012,CUST-112,Boston,Hartford,VEH-12,160,delivered,2026-03-01T14:00:00
+ORD-013,CUST-113,Dallas,San Antonio,VEH-13,420,in_transit,2026-03-02T06:00:00
+ORD-014,CUST-114,Minneapolis,Milwaukee,VEH-14,530,pending,2026-03-02T08:45:00
+ORD-015,CUST-115,San Francisco,Sacramento,VEH-15,145,delivered,2026-03-02T09:30:00
+ORD-016,CUST-116,Nashville,Memphis,VEH-16,340,in_transit,2026-03-02T13:00:00
+ORD-017,CUST-117,Tampa,Jacksonville,VEH-17,320,delayed,2026-03-02T15:00:00
+ORD-018,CUST-118,Portland,Seattle,VEH-18,280,delivered,2026-03-03T07:30:00
+ORD-019,CUST-119,Charlotte,Raleigh,VEH-19,250,in_transit,2026-03-03T08:00:00
+ORD-020,CUST-120,Detroit,Cleveland,VEH-20,270,pending,2026-03-03T10:30:00
+ORD-021,CUST-121,New York,Philadelphia,VEH-01,160,delivered,2026-02-28T08:00:00
+ORD-022,CUST-122,Los Angeles,Las Vegas,VEH-03,430,in_transit,2026-03-03T11:00:00
+ORD-023,CUST-123,Chicago,Minneapolis,VEH-02,660,pending,2026-03-03T12:00:00
+ORD-024,CUST-124,Houston,New Orleans,VEH-04,560,delayed,2026-03-03T13:30:00
+ORD-025,CUST-125,Miami,Atlanta,VEH-09,1070,in_transit,2026-03-03T14:00:00
+ORD-026,CUST-126,Denver,Phoenix,VEH-10,940,pending,2026-03-04T07:00:00
+ORD-027,CUST-127,Boston,New York,VEH-12,350,delivered,2026-02-27T09:00:00
+ORD-028,CUST-128,Dallas,Houston,VEH-13,380,in_transit,2026-03-04T08:00:00
+ORD-029,CUST-129,San Diego,Los Angeles,VEH-24,190,delivered,2026-03-01T11:00:00
+ORD-030,CUST-130,Austin,Houston,VEH-22,260,in_transit,2026-03-04T09:00:00
+ORD-031,CUST-131,New York,Boston,VEH-01,350,delayed,2026-02-25T08:00:00
+ORD-032,CUST-132,Seattle,Portland,VEH-18,280,delivered,2026-02-26T10:00:00
+ORD-033,CUST-133,Los Angeles,San Diego,VEH-24,190,in_transit,2026-03-04T10:00:00
+ORD-034,CUST-134,Phoenix,Las Vegas,VEH-21,450,pending,2026-03-04T11:00:00
+ORD-035,CUST-135,Atlanta,Miami,VEH-11,1070,cancelled,2026-03-01T13:00:00
+ORD-036,CUST-136,Nashville,Atlanta,VEH-16,400,in_transit,2026-03-04T12:00:00
+ORD-037,CUST-137,Tampa,Miami,VEH-17,480,delayed,2026-03-04T13:00:00
+ORD-038,CUST-138,Minneapolis,Chicago,VEH-14,660,delivered,2026-02-28T14:00:00
+ORD-039,CUST-139,Charlotte,Atlanta,VEH-19,400,in_transit,2026-03-04T14:00:00
+ORD-040,CUST-140,Detroit,Chicago,VEH-20,450,pending,2026-03-04T15:00:00
+ORD-041,CUST-141,Jacksonville,Tampa,VEH-25,320,in_transit,2026-03-04T16:00:00
+ORD-042,CUST-142,Las Vegas,Phoenix,VEH-21,450,delivered,2026-02-27T07:00:00
+ORD-043,CUST-143,Salt Lake City,Denver,VEH-10,820,pending,2026-03-05T08:00:00
+ORD-044,CUST-144,Cleveland,Detroit,VEH-20,270,in_transit,2026-03-05T09:00:00
+ORD-045,CUST-145,Sacramento,San Francisco,VEH-15,145,delivered,2026-03-03T16:00:00
+ORD-046,CUST-146,Milwaukee,Minneapolis,VEH-14,530,delayed,2026-03-04T17:00:00
+ORD-047,CUST-147,Hartford,Boston,VEH-12,160,in_transit,2026-03-05T10:00:00
+ORD-048,CUST-148,Orlando,Miami,VEH-09,380,pending,2026-03-05T11:00:00
+ORD-049,CUST-149,Memphis,Nashville,VEH-16,340,delivered,2026-03-02T18:00:00
+ORD-050,CUST-150,Raleigh,Charlotte,VEH-19,250,in_transit,2026-03-05T12:00:00
