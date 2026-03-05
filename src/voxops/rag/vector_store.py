@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 import chromadb
-from chromadb.config import Settings as ChromaSettings
 from loguru import logger
 
 from configs.settings import settings
@@ -62,18 +61,14 @@ class VectorStore:
         self._embedder = embedding_model or EmbeddingModel.get_instance()
         self._ephemeral = ephemeral
 
-        # Create ChromaDB client
+        # Create ChromaDB client (new API for chromadb >= 0.4)
         if ephemeral:
-            self._client = chromadb.Client()
+            self._client = chromadb.EphemeralClient()
             logger.info("VectorStore using ephemeral (in-memory) ChromaDB")
         else:
             Path(self._persist_dir).mkdir(parents=True, exist_ok=True)
-            self._client = chromadb.Client(
-                ChromaSettings(
-                    chroma_db_impl="duckdb+parquet",
-                    persist_directory=self._persist_dir,
-                    anonymized_telemetry=False,
-                )
+            self._client = chromadb.PersistentClient(
+                path=str(self._persist_dir),
             )
             logger.info("VectorStore persisting to {}", self._persist_dir)
 

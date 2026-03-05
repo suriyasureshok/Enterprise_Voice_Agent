@@ -110,7 +110,9 @@ _ORDER_ID_RE   = re.compile(r"\b(ORD-\d{3,})\b", re.IGNORECASE)
 _CUSTOMER_ID_RE = re.compile(r"\b(CUST-\d{3,})\b", re.IGNORECASE)
 _CITY_RE        = re.compile(
     r"\b(New York|Los Angeles|Chicago|Houston|Dallas|Miami|Atlanta|Denver|Seattle|Phoenix"
-    r"|San Francisco|Boston|Portland|Detroit|Minneapolis)\b",
+    r"|San Francisco|Boston|Portland|Detroit|Minneapolis|Philadelphia|San Antonio|Austin"
+    r"|Nashville|Tampa|Charlotte|Las Vegas|San Diego|Jacksonville|Memphis|Orlando"
+    r"|Salt Lake City|Hartford|Milwaukee|Cleveland|Raleigh|Sacramento|New Orleans)\b",
     re.IGNORECASE,
 )
 
@@ -155,10 +157,43 @@ Given a customer query, extract EXACTLY:
        order_id (format: ORD-NNN), customer_id (CUST-NNN),
        city, origin, destination
 
-Return ONLY valid JSON, no explanation, no markdown fences.
+IMPORTANT: Return ONLY a single JSON object. No explanation, no markdown fences,
+no thinking, no reasoning. Just the raw JSON.
 Example:
 {"intent": "shipment_status", "confidence": 0.95, "entities": {"order_id": "ORD-042"}}
 """
+
+_JSON_EXTRACT_RE = re.compile(r'\{[^{}]*"intent"\s*:\s*"[^"]*"[^{}]*\}', re.DOTALL)
+
+
+def _extract_json_from_text(text: str) -> Optional[dict]:
+    """Try to extract a JSON object from possibly verbose LLM output."""
+    # Strip <think>...</think> blocks (closed or unclosed) some models produce
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL).strip()
+
+    # First, try direct parse
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Strip markdown fences
+    cleaned = text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+    try:
+        return json.loads(cleaned)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Extract JSON from within reasoning text
+    m = _JSON_EXTRACT_RE.search(text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return None
 
 
 def _llm_classify_intent(query: str) -> Optional[ParsedIntent]:
@@ -176,13 +211,15 @@ def _llm_classify_intent(query: str) -> Optional[ParsedIntent]:
             system_prompt=_LLM_SYSTEM_PROMPT,
             user_message=query,
             temperature=0.0,
-            max_tokens=150,
+            max_tokens=400,
         )
 
-        # Strip accidental markdown fences
-        raw = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+        # Extract JSON from possibly verbose LLM output
+        parsed = _extract_json_from_text(raw)
+        if parsed is None:
+            logger.warning("LLM returned non-JSON response: {}", raw[:200])
+            return None
 
-        parsed = json.loads(raw)
         intent_str  = str(parsed.get("intent", "unknown")).lower().strip()
         confidence  = float(parsed.get("confidence", 0.75))
         entities    = {k: str(v) for k, v in (parsed.get("entities") or {}).items()}

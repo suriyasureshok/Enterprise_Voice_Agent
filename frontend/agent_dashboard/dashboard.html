@@ -1,4 +1,4 @@
-+<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="dashboard.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>" />
+  <link rel="stylesheet" href="fontawesome/css/all.min.css" />
 </head>
 <body>
 
@@ -85,6 +86,14 @@
               <button class="ctrl-btn" id="btnRecord"><i class="fas fa-circle"></i> Record Voice</button>
               <button class="ctrl-btn" id="btnPlayRec" disabled><i class="fas fa-play"></i> Play Recorded</button>
               <button class="ctrl-btn ctrl-btn--ai" id="btnPlayAI" disabled><i class="fas fa-robot"></i> Play AI Response</button>
+            </div>
+
+            <!-- Text Input -->
+            <div class="text-input-area">
+              <div class="text-input-row">
+                <input type="text" id="textInput" class="text-input" placeholder="Or type a query… e.g. Where is order ORD-001?" maxlength="300" />
+                <button class="ctrl-btn ctrl-btn--send" id="btnSendText"><i class="fas fa-paper-plane"></i> Send</button>
+              </div>
             </div>
 
             <!-- Audio Details Card -->
@@ -198,6 +207,8 @@
                   </div>
                   <span id="confidenceVal">0 %</span>
                 </div>
+                <div class="data-row"><span>Entities</span><span id="entitiesVal" class="entity-pills">—</span></div>
+                <div class="data-row"><span>Escalation</span><span id="escalationVal">—</span></div>
               </div>
             </div>
 
@@ -207,10 +218,11 @@
                 <i class="fas fa-server"></i> API Response Data
               </div>
               <div class="data-card__content" id="apiResponseContent">
+                <div class="data-row"><span>Transcript</span><span id="apiTranscript" class="data-row__wrap">—</span></div>
                 <div class="data-row"><span>Order ID</span><span id="apiOrderId">—</span></div>
-                <div class="data-row"><span>Warehouse</span><span id="apiWarehouse">—</span></div>
                 <div class="data-row"><span>Status</span><span id="apiStatus" class="badge badge--transit">—</span></div>
-                <div class="data-row"><span>ETA</span><span id="apiEta">—</span></div>
+                <div class="data-row"><span>Ticket ID</span><span id="apiTicket">—</span></div>
+                <div class="data-row"><span>Latency</span><span id="apiLatency">—</span></div>
               </div>
             </div>
 
@@ -245,7 +257,7 @@
                 <span>Knowledge Base</span>
               </div>
             </div>
-            <div class="router-path router-path--selected" id="routeAPI" data-route="api">
+            <div class="router-path" id="routeAPI" data-route="api">
               <div class="router-path__line"></div>
               <div class="router-path__node">
                 <i class="fas fa-server"></i>
@@ -264,33 +276,59 @@
       </section>
 
       <!-- ── Conversation Logs ── -->
-      <section class="logs-section glass-card">
+      <section class="logs-section glass-card" id="sectionLogs">
         <div class="panel__header panel__header--collapsible" id="logsToggle">
           <h2><i class="fas fa-scroll"></i> Conversation Logs</h2>
           <button class="expand-btn"><i class="fas fa-chevron-down"></i></button>
         </div>
-        <div class="logs-body" id="logsBody">
-          <div class="log-message log-message--user">
-            <div class="log-avatar"><i class="fas fa-user"></i></div>
-            <div class="log-content">
-              <div class="log-text">"Where is my order 123?"</div>
-              <div class="log-meta">
-                <span><i class="fas fa-clock"></i> 10:42:18 AM</span>
-                <span><i class="fas fa-tag"></i> Order Tracking</span>
-                <span><i class="fas fa-stopwatch"></i> 1.8 s</span>
-              </div>
-            </div>
+        <div class="logs-body" id="logsBody"></div>
+      </section>
+
+      <!-- ── Enterprise Data Section (Orders + Simulation) ── -->
+      <section class="enterprise-data-section glass-card" id="sectionData">
+        <div class="panel__header">
+          <h2><i class="fas fa-database"></i> Enterprise Data — Live Orders</h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="orderFilterStatus" class="order-filter-select">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_transit">In Transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="delayed">Delayed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="ctrl-btn ctrl-btn--send" id="btnRefreshOrders" style="padding:6px 14px;font-size:0.78rem;">
+              <i class="fas fa-sync-alt"></i> Refresh
+            </button>
           </div>
-          <div class="log-message log-message--ai">
-            <div class="log-avatar"><i class="fas fa-robot"></i></div>
-            <div class="log-content">
-              <div class="log-text">"Your order has left the Chennai warehouse and will arrive tomorrow by 5 PM."</div>
-              <div class="log-meta">
-                <span><i class="fas fa-clock"></i> 10:42:20 AM</span>
-                <span><i class="fas fa-tag"></i> Response</span>
-                <span><i class="fas fa-stopwatch"></i> 0.4 s</span>
-              </div>
+        </div>
+        <div class="enterprise-data-body" style="padding:16px 18px;">
+          <div class="orders-table-wrap" style="overflow-x:auto;">
+            <table class="orders-table" id="ordersTable">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Origin</th>
+                  <th>Destination</th>
+                  <th>Vehicle</th>
+                  <th>Distance</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTableBody">
+                <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.35);padding:28px;">Click Refresh to load orders…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Simulation Result (shown after clicking Predict) -->
+          <div class="simulation-result glass-card-inner" id="simulationResult" style="display:none;margin-top:16px;padding:16px;">
+            <div class="data-card__header">
+              <i class="fas fa-truck-fast"></i> Delivery Prediction
             </div>
+            <div id="simulationContent"></div>
           </div>
         </div>
       </section>
@@ -301,20 +339,23 @@
   <!-- ═══════════════ FOOTER STATUS BAR ═══════════════ -->
   <footer class="footer-bar">
     <div class="footer-item">
-      <span class="footer-dot footer-dot--green"></span>
-      <span>AI Gateway: <strong>Active</strong></span>
+      <span class="footer-dot" id="footerDot"></span>
+      <span>AI Gateway: <strong id="footerGateway">Connecting…</strong></span>
     </div>
     <div class="footer-item">
       <i class="fas fa-gauge-high"></i>
-      <span>Avg Latency: <strong id="footerLatency">1.8 s</strong></span>
+      <span>Avg Latency: <strong id="footerLatency">— s</strong></span>
     </div>
     <div class="footer-item">
-      <i class="fas fa-users"></i>
-      <span>Active Sessions: <strong id="footerSessions">3</strong></span>
+      <i class="fas fa-comments"></i>
+      <span>Queries: <strong id="footerQueries">0</strong></span>
     </div>
     <div class="footer-item">
       <i class="fas fa-clock"></i>
-      <span>Updated: <strong id="footerUpdated">Just now</strong></span>
+      <span>Updated: <strong id="footerUpdated">—</strong></span>
+    </div>
+    <div class="footer-item">
+      <span>Backend: <strong><code id="footerBackendUrl">http://localhost:8000</code></strong></span>
     </div>
   </footer>
 

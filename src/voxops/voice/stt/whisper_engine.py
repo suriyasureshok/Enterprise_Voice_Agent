@@ -112,16 +112,37 @@ class WhisperSTT:
         audio = self._resolve_input(audio_input)
         log.debug("Starting transcription (lang={}, beam={})", language, beam_size)
 
+        # Disable VAD — silero-vad crashes with 'max() arg is an empty sequence'
+        # on this system. Whisper handles silence fine via no_speech_prob.
+        kwargs["vad_filter"] = False
+
+        # Force English + anti-hallucination settings for noisy/quiet mics
+        if language is None:
+            language = "en"
+        kwargs.setdefault("condition_on_previous_text", False)
+        kwargs.setdefault("initial_prompt", "This is a customer calling about logistics, orders, deliveries, and shipments.")
+        kwargs.setdefault("temperature", 0.0)
+        kwargs.setdefault("no_speech_threshold", 0.5)
+        kwargs.setdefault("log_prob_threshold", -1.5)
+
         segments_iter, info = self.model.transcribe(
             audio,
             language=language,
             beam_size=beam_size,
             **kwargs,
         )
+        segments_raw = list(segments_iter)
+
+        log.info("Whisper returned {} raw segment(s)", len(segments_raw))
 
         segments: list[dict] = []
         full_text_parts: list[str] = []
-        for seg in segments_iter:
+        for seg in segments_raw:
+            nsp = getattr(seg, "no_speech_prob", 0.0)
+            log.info("Segment: no_speech_prob={:.2f}, text='{}'", nsp, seg.text.strip()[:80])
+            # Accept ALL segments — never filter. The user's mic produces
+            # low-energy audio that triggers high no_speech_prob even for
+            # real speech. Let the orchestrator handle garbage text.
             segments.append({
                 "start": round(seg.start, 2),
                 "end":   round(seg.end, 2),

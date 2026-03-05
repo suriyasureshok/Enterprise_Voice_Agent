@@ -3,27 +3,71 @@ VOXOPS LOGISTICS — COMPANY POLICIES
 1. DELIVERY TIMEFRAMES
    - Standard delivery: 3–5 business days
    - Express delivery: 1–2 business days
-   - Same-day delivery: Available in select metro areas
+   - Same-day delivery: Available in select metro areas for orders before 10 AM
+   - Economy delivery: 7–10 business days at reduced rates
 
 2. SHIPMENT TRACKING
    - All orders are assigned a tracking ID at dispatch.
    - Customers can query shipment status via voice or web portal.
    - Real-time updates are provided every 4 hours.
+   - Push notifications are sent on status changes (pending → in_transit → delivered).
+   - Tracking is available 24/7 through the AI voice agent.
 
 3. MISSING PACKAGES
    - Report missing packages within 30 days of expected delivery.
    - An investigation is launched within 24 hours of a report.
    - Replacement or refund is issued within 5–7 business days.
+   - Customers are notified at every step of the investigation.
 
 4. DAMAGED GOODS
    - Document damage with photos within 48 hours of delivery.
    - File a claim through the customer portal or voice agent.
    - Compensation is processed within 7–10 business days.
+   - Full replacement or refund is provided for confirmed damage.
 
 5. REROUTING
    - Rerouting requests must be made before dispatch.
    - Post-dispatch rerouting may incur a fee up to $25.
+   - Rerouting within the same city is free of charge.
+   - International rerouting is not currently supported.
 
 6. ESCALATION
    - Complex issues are escalated to a human agent automatically.
    - Agent response time is guaranteed within 2 business hours.
+   - Escalated tickets are assigned priority status.
+   - Customers receive a ticket ID for follow-up tracking.
+
+7. CANCELLATION
+   - Orders in "pending" status can be cancelled at no charge.
+   - Orders in "in_transit" status may incur a cancellation fee of $15.
+   - Delivered orders cannot be cancelled — use the return process instead.
+   - Refunds for cancelled orders are processed within 3–5 business days.
+
+8. RETURNS
+   - Return requests must be initiated within 14 days of delivery.
+   - Items must be in original packaging and undamaged condition.
+   - A prepaid return label is provided for eligible returns.
+   - Refunds are processed within 5–7 business days of receiving the returned item.
+
+9. WAREHOUSE OPERATIONS
+   - We operate 20 distribution centres across the United States.
+   - Average warehouse utilisation is monitored in real-time.
+   - Orders are assigned to the nearest warehouse with available capacity.
+   - Warehouse load exceeding 90% triggers overflow routing.
+
+10. FLEET MANAGEMENT
+    - Our fleet comprises 25 active vehicles with professional drivers.
+    - Vehicles are tracked in real-time via GPS.
+    - Vehicle maintenance is performed on a strict schedule.
+    - Vehicles in "maintenance" status are temporarily removed from dispatch.
+
+11. PRICING
+    - Pricing is based on distance, package weight, and delivery speed.
+    - Volume discounts are available for enterprise clients.
+    - Fuel surcharges may apply during periods of high fuel costs.
+
+12. DATA & PRIVACY
+    - Customer data is encrypted in transit and at rest.
+    - Voice recordings are processed locally and not stored permanently.
+    - Customers can request data deletion under our privacy policy.
+    - We comply with all applicable data protection regulations.

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoxOps AI — Enterprise Voice Agent</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>" />
+</head>
+<body>
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo"><i class="fas fa-broadcast-tower"></i></div>
+      <div class="sidebar-title">
+        <span class="brand-name">VoxOps AI</span>
+        <span class="brand-sub">Enterprise Voice Agent</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="call">
+        <i class="fas fa-phone"></i><span>Voice Call</span>
+      </a>
+      <a class="nav-item" data-page="orders">
+        <i class="fas fa-boxes-stacked"></i><span>Orders</span>
+      </a>
+      <a class="nav-item" data-page="tracking">
+        <i class="fas fa-truck-fast"></i><span>Delivery Tracker</span>
+      </a>
+      <a class="nav-item" data-page="tickets">
+        <i class="fas fa-ticket"></i><span>Support Tickets</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-indicator" id="statusIndicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Connecting…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MOBILE TOPBAR ===== -->
+  <header class="topbar" id="topbar">
+    <button class="topbar-menu" id="menuToggle"><i class="fas fa-bars"></i></button>
+    <span class="topbar-title">VoxOps AI</span>
+    <span class="status-dot-sm" id="statusDotMobile"></span>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main" id="main">
+
+    <!-- ── CALL PAGE ── -->
+    <section class="page page--active" id="page-call">
+      <div class="call-container">
+
+        <!-- IDLE: Welcome + Start Call -->
+        <div class="call-idle" id="callIdle">
+          <div class="idle-avatar">
+            <div class="idle-avatar-ring"></div>
+            <i class="fas fa-headset"></i>
+          </div>
+          <h2 class="idle-title">VoxOps AI Agent</h2>
+          <p class="idle-sub">Tap to start a voice call with our AI logistics assistant</p>
+          <div class="quick-chips" id="quickChips">
+            <button class="chip" data-q="Where is order ORD-001?"><i class="fas fa-box"></i> Track ORD-001</button>
+            <button class="chip" data-q="When will ORD-003 be delivered?"><i class="fas fa-clock"></i> ETA ORD-003</button>
+            <button class="chip" data-q="Show me all delayed orders"><i class="fas fa-triangle-exclamation"></i> Delayed</button>
+            <button class="chip" data-q="What is the return policy?"><i class="fas fa-rotate-left"></i> Return policy</button>
+            <button class="chip" data-q="I want to speak to an agent"><i class="fas fa-user-tie"></i> Human agent</button>
+          </div>
+          <button class="call-btn call-btn--start" id="callStartBtn">
+            <i class="fas fa-phone"></i><span>Start Call</span>
+          </button>
+          <div class="idle-text-area">
+            <div class="text-input-wrap">
+              <input type="text" id="textInput" class="text-input" placeholder="Or type a question…" maxlength="500" autocomplete="off" />
+              <button class="send-btn" id="sendBtn" title="Send"><i class="fas fa-paper-plane"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVE CALL -->
+        <div class="call-active" id="callActive" hidden>
+          <div class="call-top">
+            <div class="agent-avatar" id="agentAvatar">
+              <div class="pulse-ring" id="pulseRing"></div>
+              <div class="avatar-core"><i class="fas fa-headset"></i></div>
+            </div>
+            <div class="agent-label">VoxOps AI Agent</div>
+            <div class="call-timer" id="callTimer">00:00</div>
+            <div class="call-status" id="callStatus">Connecting…</div>
+          </div>
+
+          <!-- Live waveform -->
+          <div class="wave-wrap">
+            <canvas id="waveCanvas" width="360" height="64"></canvas>
+          </div>
+
+          <!-- Captions (live transcription) -->
+          <div class="captions-box" id="captionsBox">
+            <div class="captions-inner" id="captionsInner"></div>
+          </div>
+
+          <!-- Call actions -->
+          <div class="call-actions">
+            <button class="action-btn" id="muteBtn" title="Mute">
+              <i class="fas fa-microphone"></i><span>Mute</span>
+            </button>
+            <button class="call-btn call-btn--end" id="callEndBtn" title="End Call">
+              <i class="fas fa-phone-slash"></i>
+            </button>
+            <button class="action-btn" id="keypadBtn" title="Type">
+              <i class="fas fa-keyboard"></i><span>Type</span>
+            </button>
+          </div>
+
+          <!-- Inline typing (toggle via keypad) -->
+          <div class="call-type-area" id="callTypeArea" hidden>
+            <div class="text-input-wrap">
+              <input type="text" id="callTextBox" class="text-input" placeholder="Type your question…" maxlength="500" autocomplete="off" />
+              <button class="send-btn" id="callSendBtn"><i class="fas fa-paper-plane"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation log -->
+        <div class="conv-log" id="convLog" hidden>
+          <div class="log-header">
+            <span><i class="fas fa-scroll"></i> Conversation Log</span>
+            <button class="icon-btn" id="clearLog" title="Clear"><i class="fas fa-trash-can"></i></button>
+          </div>
+          <div class="log-body" id="logBody"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── ORDERS PAGE ── -->
+    <section class="page" id="page-orders">
+      <div class="page-header"><h1><i class="fas fa-boxes-stacked"></i> Orders</h1><p>Browse and search all enterprise orders</p></div>
+      <div class="controls-row">
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" id="orderSearch" placeholder="Search by Order ID, Customer, City…" /></div>
+        <select id="orderFilter" class="select-input">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="in_transit">In Transit</option>
+          <option value="delivered">Delivered</option>
+          <option value="delayed">Delayed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <button class="btn btn--primary" id="refreshOrders"><i class="fas fa-sync-alt"></i> Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table"><thead><tr>
+          <th>Order ID</th><th>Customer</th><th>Origin</th><th>Destination</th>
+          <th>Vehicle</th><th>Distance</th><th>Status</th><th>Created</th>
+        </tr></thead><tbody id="ordersBody"><tr><td colspan="8" class="empty-row">Loading…</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- ── DELIVERY TRACKER ── -->
+    <section class="page" id="page-tracking">
+      <div class="page-header"><h1><i class="fas fa-truck-fast"></i> Delivery Tracker</h1><p>Predict delivery time via simulation</p></div>
+      <div class="tracker-form">
+        <div class="form-group"><label for="trackOrderId">Order ID</label>
+          <div class="input-with-btn">
+            <input type="text" id="trackOrderId" class="form-input" placeholder="e.g. ORD-001" />
+            <button class="btn btn--primary" id="trackBtn"><i class="fas fa-chart-line"></i> Predict</button>
+          </div>
+        </div>
+      </div>
+      <div id="predictionResult" hidden></div>
+      <div id="predictionEmpty" class="empty-state"><i class="fas fa-map-location-dot"></i><p>Enter an order ID above to simulate delivery prediction</p></div>
+    </section>
+
+    <!-- ── TICKETS PAGE ── -->
+    <section class="page" id="page-tickets">
+      <div class="page-header"><h1><i class="fas fa-ticket"></i> Support Tickets</h1><p>Escalation tickets from voice interactions</p></div>
+      <div class="controls-row"><button class="btn btn--primary" id="refreshTickets"><i class="fas fa-sync-alt"></i> Refresh</button></div>
+      <div class="table-wrap">
+        <table class="data-table"><thead><tr>
+          <th>Ticket ID</th><th>Customer</th><th>Priority</th><th>Status</th>
+          <th>Issue Summary</th><th>Order</th><th>Created</th>
+        </tr></thead><tbody id="ticketsBody"><tr><td colspan="7" class="empty-row">No tickets yet</td></tr></tbody></table>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>

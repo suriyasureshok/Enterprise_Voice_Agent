@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Speech-to-Text (Whisper)
     # -------------------------------------------------
     whisper_model_size: str = Field(
-        default="base",
+        default="small",
         description="Whisper model size: tiny | base | small | medium | large",
     )
 
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     # Free models: mistralai/mistral-7b-instruct:free
     #              meta-llama/llama-3.1-8b-instruct:free
     #              google/gemma-3-12b-it:free
-    llm_model_name: str = Field(default="mistralai/mistral-7b-instruct:free")
+    llm_model_name: str = Field(default="meta-llama/llama-3.2-3b-instruct:free")
     llm_temperature: float = Field(default=0.2)
     llm_max_tokens: int = Field(default=512)
 
