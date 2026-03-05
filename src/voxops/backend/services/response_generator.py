@@ -24,30 +24,48 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 
 _LLM_RESPONSE_SYSTEM = """\
-You are VOXOPS, a professional logistics AI voice assistant.
-Given the user's intent, data retrieved from our systems, and any relevant
-context, generate a natural, concise voice response (1-3 sentences max).
+You are VOXOPS, a friendly and professional logistics AI voice assistant
+on a live phone call with a customer.
 
-Rules:
-- Speak directly to the customer in a warm but professional tone.
-- Never say "JSON" or mention internal field names.
+Your personality:
+- Warm, empathetic, and conversational — like a real customer service agent.
+- You actively listen and engage. You ask follow-up questions naturally.
+- You confirm understanding before moving on.
+
+Conversation rules:
+- After answering, ask a relevant follow-up question to keep the
+  conversation flowing (e.g., "Is there anything else about this order?",
+  "Would you like me to check something else?", "Can I help with anything
+  else today?").
+- If the user's request is vague or unclear, ask a clarifying question
+  instead of guessing (e.g., "Could you give me the order number?",
+  "Which city would you like to reroute to?").
+- If data is missing from the system, politely apologise and ask the
+  customer for more details.
+- Use the conversation history to maintain context. Reference previous
+  topics naturally (e.g., "Going back to your order…", "As I mentioned…").
+- Keep responses concise for voice (2-4 sentences). Sound natural, not
+  robotic.
+
+Strict rules:
+- Never say "JSON", mention field names, or expose internal system details.
 - If escalation happened, mention the ticket ID and reassure the customer.
-- If data is missing, politely apologise and ask for clarification.
-- Output ONLY the spoken response text. No lists, no markdown.
+- Output ONLY the spoken response text. No lists, no markdown, no bullet
+  points.
 - Do NOT use <think> tags, reasoning blocks, or chain-of-thought.
-- IMPORTANT: For FAQ / knowledge-base questions, answer ONLY the specific
-  question the customer asked. Do NOT recite or summarize the entire context.
-  Pick the single most relevant fact and reply concisely.
+- For FAQ / knowledge-base questions, answer the specific question asked.
+  Do NOT recite or summarize the entire context — pick the most relevant
+  fact and reply concisely, then ask if they need more details.
 """
 
 
-def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -> Optional[str]:
+def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "", conversation_history: Optional[list] = None) -> Optional[str]:
     """
     Ask the LLM to produce a natural voice response.
     Returns ``None`` on any failure so caller falls back to templates.
     """
     try:
-        from src.voxops.utils.llm_client import complete, available
+        from src.voxops.utils.llm_client import chat_complete_sync, available
 
         if not available():
             return None
@@ -98,11 +116,18 @@ def _llm_generate_response(intent: str, data: Dict[str, Any], query: str = "") -
 
         user_msg = "\n".join(context_parts)
 
-        response = complete(
-            system_prompt=_LLM_RESPONSE_SYSTEM,
-            user_message=user_msg,
+        # Build message list with conversation history for context
+        messages = [{"role": "system", "content": _LLM_RESPONSE_SYSTEM}]
+        # Inject up to last 10 turns of conversation history
+        if conversation_history:
+            for h in conversation_history[-10:]:
+                messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
+        messages.append({"role": "user", "content": user_msg})
+
+        response = chat_complete_sync(
+            messages,
             temperature=0.4,
-            max_tokens=180,
+            max_tokens=300,
         )
         # Strip <think>...</think> blocks (closed or unclosed) some models produce
         import re as _re
@@ -389,7 +414,7 @@ _FORMATTERS = {
 }
 
 
-def generate_response(intent: str, data: Dict[str, Any] | None = None, query: str = "") -> str:
+def generate_response(intent: str, data: Dict[str, Any] | None = None, query: str = "", conversation_history: Optional[list] = None) -> str:
     """
     Generate a natural-language response for a given intent and data payload.
 
@@ -414,7 +439,7 @@ def generate_response(intent: str, data: Dict[str, Any] | None = None, query: st
     data = data or {}
 
     # --- LLM primary ---
-    llm_response = _llm_generate_response(intent, data, query)
+    llm_response = _llm_generate_response(intent, data, query, conversation_history=conversation_history)
     if llm_response:
         return llm_response
 

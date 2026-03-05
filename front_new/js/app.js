@@ -8,6 +8,9 @@
   // Dynamically use the same host the page was loaded from (works for localhost AND remote IP)
   const API = window.location.origin;
 
+  /* ─── Session Memory ─── */
+  let sessionId = null;
+
   /* ─── Voice Fillers ─── */
   const FILLERS_THINKING = [
     "Umm, let me check that for you…",
@@ -198,6 +201,7 @@
 
   function endCall() {
     callActive = false;
+    sessionId = null;
     stopListening();
     stopAudio();
     clearInterval(callTimerInterval);
@@ -300,6 +304,7 @@
     try {
       const fd = new FormData();
       fd.append("text", norm);
+      if (sessionId) fd.append("session_id", sessionId);
       const r = await fetch(API + "/voice/voice-query", { method: "POST", body: fd });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
@@ -307,6 +312,7 @@
       // Stop filler TTS if still playing
       window.speechSynthesis.cancel();
 
+      if (data.session_id) sessionId = data.session_id;
       const answer = data.response_text || "Sorry, I didn't get that.";
       addCaption("agent", answer);
       addLog("ai", answer, data.intent, data.confidence);

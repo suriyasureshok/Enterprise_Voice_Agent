@@ -281,8 +281,8 @@ def process_query(
     """
     logger.info("Orchestrator processing: '{}'", query[:120])
 
-    # 1. Intent detection
-    parsed = parse_intent(query)
+    # 1. Intent detection (with history for contextual follow-ups)
+    parsed = parse_intent(query, conversation_history=conversation_history)
 
     # merge supplied customer_id into entities
     if customer_id and "customer_id" not in parsed.entities:
@@ -313,8 +313,8 @@ def process_query(
             "status": handoff.status,
         }
 
-    # 4. Response generation (pass original query for LLM context)
-    response_text = generate_response(parsed.intent.value, data, query=query)
+    # 4. Response generation (pass original query + history for LLM context)
+    response_text = generate_response(parsed.intent.value, data, query=query, conversation_history=conversation_history)
 
     result = OrchestratorResult(
         transcript=query,

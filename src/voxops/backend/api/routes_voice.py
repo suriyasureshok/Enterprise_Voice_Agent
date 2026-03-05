@@ -184,6 +184,59 @@ class VoiceQueryResponse(BaseModel):
     audio_url: str | None = None
     needs_escalation: bool = False
     ticket_id: str | None = None
+    session_id: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# In-memory session store — conversation history per call
+# ---------------------------------------------------------------------------
+
+import time as _time
+import uuid as _uuid
+from collections import OrderedDict
+
+_MAX_SESSIONS = 200
+_SESSION_TTL = 1800  # 30 minutes
+
+
+class _SessionStore:
+    """Simple in-memory conversation store keyed by session_id."""
+
+    def __init__(self):
+        self._data: OrderedDict[str, dict] = OrderedDict()
+
+    def get_or_create(self, session_id: str | None) -> tuple[str, list[dict]]:
+        self._evict()
+        if session_id and session_id in self._data:
+            entry = self._data[session_id]
+            entry["ts"] = _time.time()
+            self._data.move_to_end(session_id)
+            return session_id, entry["history"]
+        sid = session_id or _uuid.uuid4().hex[:12]
+        self._data[sid] = {"history": [], "ts": _time.time()}
+        return sid, self._data[sid]["history"]
+
+    def append(self, session_id: str, role: str, content: str):
+        if session_id in self._data:
+            self._data[session_id]["history"].append({"role": role, "content": content})
+            # Keep last 20 turns to avoid unbounded growth
+            hist = self._data[session_id]["history"]
+            if len(hist) > 20:
+                self._data[session_id]["history"] = hist[-20:]
+
+    def _evict(self):
+        now = _time.time()
+        while self._data:
+            oldest_key, oldest_val = next(iter(self._data.items()))
+            if now - oldest_val["ts"] > _SESSION_TTL:
+                del self._data[oldest_key]
+            else:
+                break
+        while len(self._data) > _MAX_SESSIONS:
+            self._data.popitem(last=False)
+
+
+_sessions = _SessionStore()
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +270,7 @@ def _normalize_transcript(text: str) -> str:
 async def voice_query(
     audio: Optional[UploadFile] = File(None, description="Audio file (WAV/MP3)"),
     text: Optional[str] = Form(None, description="Text query (alternative to audio)"),
+    session_id: Optional[str] = Form(None, description="Session ID for conversation continuity"),
     db: Session = Depends(get_db),
 ):
     """
@@ -281,10 +335,13 @@ async def voice_query(
             ticket_id=None,
         )
 
+    # --- Session memory ---
+    sid, history = _sessions.get_or_create(session_id)
+
     # --- Orchestrator: intent → data → simulation → response → handoff ---
     from src.voxops.backend.services.orchestrator import process_query
 
-    result = process_query(query=transcript, db=db)
+    result = process_query(query=transcript, db=db, conversation_history=history)
 
     # --- TTS: generate audio file (best-effort) ---
     audio_url: str | None = None
@@ -299,6 +356,10 @@ async def voice_query(
     except Exception as exc:
         log.warning("TTS generation failed (non-fatal): {}", exc)
 
+    # --- Update session history ---
+    _sessions.append(sid, "user", transcript)
+    _sessions.append(sid, "assistant", result.response_text)
+
     return VoiceQueryResponse(
         transcript=result.transcript,
         intent=result.intent,
@@ -308,4 +369,5 @@ async def voice_query(
         audio_url=audio_url,
         needs_escalation=result.needs_escalation,
         ticket_id=result.handoff.ticket_id if result.handoff else None,
+        session_id=sid,
     )
